@@ -1,0 +1,316 @@
+{
+  "meta": {
+    "seed": 20261012,
+    "generatedAt": "2026-10-12T17:55:02.286Z",
+    "note": "同 batch_test 用例(SEED=20261012)"
+  },
+  "families": {
+    "INTERSECT": [
+      {
+        "method": "system",
+        "n": 2000,
+        "ok": 2000,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 2.6255,
+        "p50Time": 0.6332999999999629,
+        "p99Time": 1.550200000000018,
+        "maxTime": 9.110700000000008,
+        "distP50": 0,
+        "distMax": 9.550319010530261e-9
+      },
+      {
+        "method": "lmNoPre",
+        "n": 2000,
+        "ok": 2000,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 2.488,
+        "p50Time": 0.5856999999998607,
+        "p99Time": 1.133100000000013,
+        "maxTime": 1.937199999999848,
+        "distP50": 0,
+        "distMax": 9.865735222440964e-9
+      },
+      {
+        "method": "gnNoPre",
+        "n": 2000,
+        "ok": 2000,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 2.982,
+        "p50Time": 0.16020000000025902,
+        "p99Time": 0.41909999999961656,
+        "maxTime": 1.1563000000001011,
+        "distP50": 0,
+        "distMax": 4.440892098500626e-16
+      }
+    ],
+    "TANGENT": [
+      {
+        "method": "system",
+        "n": 400,
+        "ok": 400,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 4.1525,
+        "p50Time": 0.6019000000001142,
+        "p99Time": 1.9067000000000007,
+        "maxTime": 3.637399999999616,
+        "distP50": 0,
+        "distMax": 9.948918734507623e-9
+      },
+      {
+        "method": "lmNoPre",
+        "n": 400,
+        "ok": 400,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 3.7575,
+        "p50Time": 0.5778999999997723,
+        "p99Time": 2.026100000000042,
+        "maxTime": 2.7252999999996064,
+        "distP50": 0,
+        "distMax": 9.833546397436054e-9
+      },
+      {
+        "method": "gnNoPre",
+        "n": 400,
+        "ok": 400,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 3.66,
+        "p50Time": 0.18150000000014188,
+        "p99Time": 0.40830000000005384,
+        "maxTime": 0.45919999999978245,
+        "distP50": 0,
+        "distMax": 0
+      }
+    ],
+    "HIGH_ORDER": [
+      {
+        "method": "system",
+        "n": 400,
+        "ok": 400,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 2.305,
+        "p50Time": 0.875999999999749,
+        "p99Time": 1.628400000000056,
+        "maxTime": 1.8566999999998188,
+        "distP50": 0,
+        "distMax": 6.946053812044522e-9
+      },
+      {
+        "method": "lmNoPre",
+        "n": 400,
+        "ok": 400,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 2.2875,
+        "p50Time": 0.8219999999996617,
+        "p99Time": 1.3697000000001935,
+        "maxTime": 2.210199999999986,
+        "distP50": 0,
+        "distMax": 4.572667429286821e-9
+      },
+      {
+        "method": "gnNoPre",
+        "n": 400,
+        "ok": 400,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 3.0275,
+        "p50Time": 0.1948999999995067,
+        "p99Time": 0.418800000000374,
+        "maxTime": 0.46339999999963766,
+        "distP50": 0,
+        "distMax": 2.237726045655905e-16
+      }
+    ],
+    "SEPARATED": [
+      {
+        "method": "system",
+        "n": 1000,
+        "ok": 1000,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 31.959,
+        "p50Time": 3.7304000000003725,
+        "p99Time": 9.371900000000096,
+        "maxTime": 10.335100000000239,
+        "distP50": 4.390262350336874,
+        "distMax": 8.981687841633113
+      },
+      {
+        "method": "lmNoPre",
+        "n": 1000,
+        "ok": 1000,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 15.503,
+        "p50Time": 0.733699999998862,
+        "p99Time": 10.178900000000795,
+        "maxTime": 13.89980000000105,
+        "distP50": 4.558362266190804,
+        "distMax": 10.801168344010453
+      },
+      {
+        "method": "gnNoPre",
+        "n": 1000,
+        "ok": 1000,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 2.448,
+        "p50Time": 0.1356000000014319,
+        "p99Time": 0.32269999999880383,
+        "maxTime": 0.6525000000001455,
+        "distP50": 4.808756337770453,
+        "distMax": 10.261510431088963
+      }
+    ],
+    "NEAR": [
+      {
+        "method": "system",
+        "n": 400,
+        "ok": 400,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 36.7725,
+        "p50Time": 1.3792999999986932,
+        "p99Time": 10.237900000000081,
+        "maxTime": 11.069000000001324,
+        "distP50": 0.029495842746525492,
+        "distMax": 0.05753478579376218
+      },
+      {
+        "method": "lmNoPre",
+        "n": 400,
+        "ok": 400,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 36.34,
+        "p50Time": 1.1864000000005035,
+        "p99Time": 10.74789999999848,
+        "maxTime": 12.832300000000032,
+        "distP50": 0.02949584274655715,
+        "distMax": 0.05753478579386652
+      },
+      {
+        "method": "gnNoPre",
+        "n": 400,
+        "ok": 400,
+        "familyAcc": 100,
+        "convRate": 100,
+        "avgIter": 3.1425,
+        "p50Time": 0.16049999999995634,
+        "p99Time": 0.3996999999999389,
+        "maxTime": 0.4364999999997963,
+        "distP50": 0.039402175722643595,
+        "distMax": 0.059947254629805546
+      }
+    ]
+  },
+  "scaling": [
+    {
+      "degree": 2,
+      "nControlPoints": 6,
+      "n": 40,
+      "avgIter": 2.275,
+      "p50Time": 0.7001999999993131,
+      "maxTime": 1.701999999999316,
+      "familyAcc": 100
+    },
+    {
+      "degree": 2,
+      "nControlPoints": 10,
+      "n": 40,
+      "avgIter": 2.025,
+      "p50Time": 0.741199999998571,
+      "maxTime": 1.2672999999995227,
+      "familyAcc": 100
+    },
+    {
+      "degree": 2,
+      "nControlPoints": 15,
+      "n": 40,
+      "avgIter": 2.25,
+      "p50Time": 0.8438000000005559,
+      "maxTime": 1.6358000000000175,
+      "familyAcc": 100
+    },
+    {
+      "degree": 3,
+      "nControlPoints": 6,
+      "n": 40,
+      "avgIter": 2.9,
+      "p50Time": 0.6939000000002125,
+      "maxTime": 1.255699999999706,
+      "familyAcc": 100
+    },
+    {
+      "degree": 3,
+      "nControlPoints": 10,
+      "n": 40,
+      "avgIter": 2.325,
+      "p50Time": 0.9649000000008527,
+      "maxTime": 2.332800000000134,
+      "familyAcc": 100
+    },
+    {
+      "degree": 3,
+      "nControlPoints": 15,
+      "n": 40,
+      "avgIter": 2.775,
+      "p50Time": 1.0522000000000844,
+      "maxTime": 2.7101000000002387,
+      "familyAcc": 100
+    },
+    {
+      "degree": 5,
+      "nControlPoints": 6,
+      "n": 40,
+      "avgIter": 2.35,
+      "p50Time": 0.9963999999999942,
+      "maxTime": 1.993400000001202,
+      "familyAcc": 100
+    },
+    {
+      "degree": 5,
+      "nControlPoints": 10,
+      "n": 40,
+      "avgIter": 2.225,
+      "p50Time": 1.1080000000001746,
+      "maxTime": 3.025499999999738,
+      "familyAcc": 100
+    },
+    {
+      "degree": 5,
+      "nControlPoints": 15,
+      "n": 40,
+      "avgIter": 2.975,
+      "p50Time": 1.2934999999997672,
+      "maxTime": 3.6207000000013068,
+      "familyAcc": 100
+    },
+    {
+      "degree": 7,
+      "nControlPoints": 10,
+      "n": 40,
+      "avgIter": 2.125,
+      "p50Time": 1.4483999999993102,
+      "maxTime": 3.7584999999999127,
+      "familyAcc": 100
+    },
+    {
+      "degree": 7,
+      "nControlPoints": 15,
+      "n": 40,
+      "avgIter": 1.75,
+      "p50Time": 1.6146999999982654,
+      "maxTime": 2.263300000000527,
+      "familyAcc": 100
+    }
+  ],
+  "runtimeMs": 13399
+}

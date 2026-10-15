@@ -1,0 +1,90 @@
+<html style="margin:0;padding:0;">
+<title>NURBS 系统优化分析图</title>
+<div style="width:100%;box-sizing:border-box;background:#0f1420;color:#e6e8ee;font-family:'Segoe UI','Microsoft YaHei',sans-serif;padding:20px;">
+
+  <div style="font-size:20px;font-weight:700;margin-bottom:4px;">NURBS 统一数值框架 · 优化分析</div>
+  <div style="font-size:13px;color:#9aa3b5;margin-bottom:18px;">调用链热点 + 双份代码重复 + P0/P1/P2 优化优先级（示意，非精确测绘图）</div>
+
+  <!-- 调用链热点图 -->
+  <div style="font-size:15px;font-weight:700;color:#7fd0ff;margin-bottom:10px;">① 热点调用链：性能瓶颈所在</div>
+  <svg viewBox="0 0 900 300" style="width:100%;box-sizing:border-box;background:#141a29;border:1px solid #2a3348;border-radius:8px;" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8a94ab"/></marker>
+    </defs>
+    <!-- 图层 1: 入口 -->
+    <g>
+      <rect x="20" y="30" width="170" height="52" rx="8" fill="#1e2a44" stroke="#3b5aa8"/>
+      <text x="105" y="52" text-anchor="middle" fill="#cfe0ff" font-size="14">index.html（入口）</text>
+      <text x="105" y="70" text-anchor="middle" fill="#9aa3b5" font-size="12">2043 行 · 内联重复数学</text>
+    </g>
+    <!-- 图层 2: 渲染与求解 -->
+    <g>
+      <rect x="250" y="12" width="180" height="48" rx="8" fill="#1e2a44" stroke="#3b5aa8"/>
+      <text x="340" y="32" text-anchor="middle" fill="#cfe0ff" font-size="14">render / canvas_engine</text>
+      <text x="340" y="50" text-anchor="middle" fill="#9aa3b5" font-size="12">adaptiveSubdivide + 交互重绘</text>
+
+      <rect x="250" y="88" width="180" height="48" rx="8" fill="#1e2a44" stroke="#3b5aa8"/>
+      <text x="340" y="108" text-anchor="middle" fill="#cfe0ff" font-size="14">solver / unified_solver</text>
+      <text x="340" y="126" text-anchor="middle" fill="#9aa3b5" font-size="12">LM × 多初值 × 细分求交</text>
+    </g>
+    <!-- 图层 3: 目标函数 -->
+    <g>
+      <rect x="490" y="48" width="150" height="52" rx="8" fill="#2a2a44" stroke="#6a5aa8"/>
+      <text x="565" y="68" text-anchor="middle" fill="#e6d6ff" font-size="14">objectiveFunction</text>
+      <text x="565" y="86" text-anchor="middle" fill="#9aa3b5" font-size="12">每 LM 步调 2~3 次</text>
+    </g>
+    <!-- 图层 4: 热点 -->
+    <g>
+      <rect x="690" y="12" width="195" height="120" rx="8" fill="#44201f" stroke="#d05a4a" stroke-width="2"/>
+      <text x="787" y="36" text-anchor="middle" fill="#ff9d8a" font-size="14" font-weight="700">★ 核心热点</text>
+      <text x="787" y="58" text-anchor="middle" fill="#e6e8ee" font-size="13">evaluatePoint /</text>
+      <text x="787" y="76" text-anchor="middle" fill="#e6e8ee" font-size="13">evaluateFirstDerivative</text>
+      <text x="787" y="100" text-anchor="middle" fill="#ffb4a4" font-size="12">递归 basisFunction O(2^p)</text>
+      <text x="787" y="118" text-anchor="middle" fill="#ffb4a4" font-size="12">+ 有限差分导数(误差~1e-6)</text>
+    </g>
+    <!-- 连线 -->
+    <g stroke="#8a94ab" stroke-width="1.6" fill="none">
+      <line x1="190" y1="52" x2="250" y2="48" marker-end="url(#arr)"/>
+      <line x1="190" y1="60" x2="250" y2="104" marker-end="url(#arr)"/>
+      <line x1="430" y1="66" x2="490" y2="74" marker-end="url(#arr)"/>
+      <line x1="640" y1="74" x2="690" y2="60" marker-end="url(#arr)"/>
+    </g>
+    <!-- 标签 -->
+    <text x="460" y="150" fill="#8a94ab" font-size="12">整体成本 ≈ 迭代数 × 初值数 × 每步求值成本</text>
+    <text x="460" y="168" fill="#8a94ab" font-size="12">→ 求值热点每提速 K 倍，全求解器近似提速 K 倍</text>
+  </svg>
+
+  <!-- 重复代码 -->
+  <div style="font-size:15px;font-weight:700;color:#ffd27f;margin:18px 0 10px;">② 双份数学实现：维护性隐患</div>
+  <svg viewBox="0 0 900 120" style="width:100%;box-sizing:border-box;background:#141a29;border:1px solid #2a3348;border-radius:8px;" xmlns="http://www.w3.org/2000/svg">
+    <rect x="30" y="25" width="380" height="70" rx="8" fill="#3a2a12" stroke="#c99a3a"/>
+    <text x="220" y="48" text-anchor="middle" fill="#ffd27f" font-size="14" font-weight="700">src/nurbs/math_core.js</text>
+    <text x="220" y="70" text-anchor="middle" fill="#cfc0a0" font-size="12">findSpan · basisFunction · evaluatePoint</text>
+    <text x="220" y="86" text-anchor="middle" fill="#cfc0a0" font-size="12">evaluateFirstDerivative · 导数</text>
+
+    <rect x="490" y="25" width="380" height="70" rx="8" fill="#3a2a12" stroke="#c99a3a"/>
+    <text x="680" y="48" text-anchor="middle" fill="#ffd27f" font-size="14" font-weight="700">index.html 内联副本（第794~1288行）</text>
+    <text x="680" y="70" text-anchor="middle" fill="#cfc0a0" font-size="12">同样的函数再抄一份，且导数用不同实现</text>
+    <text x="680" y="86" text-anchor="middle" fill="#cfc0a0" font-size="12">（“与内联版保持一致”即由此而来）</text>
+
+    <line x1="410" y1="60" x2="490" y2="60" stroke="#c99a3a" stroke-width="2" stroke-dasharray="5,4"/>
+    <text x="450" y="112" text-anchor="middle" fill="#c99a3a" font-size="12">同步维护、极易漂移 → 应统一由 index.html import src/ 模块</text>
+  </svg>
+
+  <!-- 优先级表 -->
+  <div style="font-size:15px;font-weight:700;color:#8fe3a0;margin:18px 0 10px;">③ 优化优先级（收益 × 成本）</div>
+  <table style="width:100%;box-sizing:border-box;border-collapse:collapse;font-size:14px;">
+    <tr style="background:#1e2a44;">
+      <th style="padding:8px 10px;text-align:left;border:1px solid #2a3348;color:#7fd0ff;">级别</th>
+      <th style="padding:8px 10px;text-align:left;border:1px solid #2a3348;color:#7fd0ff;">改动点</th>
+      <th style="padding:8px 10px;text-align:left;border:1px solid #2a3348;color:#7fd0ff;">收益</th>
+    </tr>
+    <tr><td style="padding:8px 10px;border:1px solid #2a3348;color:#ffb4a4;font-weight:700;">P0</td><td style="padding:8px 10px;border:1px solid #2a3348;">evaluatePoint 改用 de Boor 三角（O(p²)，替代 O(2^p) 递归）</td><td style="padding:8px 10px;border:1px solid #2a3348;">求解器整体提速数倍，零风险</td></tr>
+    <tr><td style="padding:8px 10px;border:1px solid #2a3348;color:#ffb4a4;font-weight:700;">P0</td><td style="padding:8px 10px;border:1px solid #2a3348;">evaluateFirstDerivative 改解析导数，去掉有限差分 h=1e-6</td><td style="padding:8px 10px;border:1px solid #2a3348;">更快 + 更准（导数误差 1e-6→机器精度）</td></tr>
+    <tr><td style="padding:8px 10px;border:1px solid #2a3348;color:#ffb4a4;font-weight:700;">P0</td><td style="padding:8px 10px;border:1px solid #2a3348;">渲染交互加 requestAnimationFrame 防抖（替代每次事件全量重绘）</td><td style="padding:8px 10px;border:1px solid #2a3348;">拖拽/滚轮缩放不再卡顿</td></tr>
+    <tr><td style="padding:8px 10px;border:1px solid #2a3348;color:#ffd27f;font-weight:700;">P1</td><td style="padding:8px 10px;border:1px solid #2a3348;">index.html 去重，统一 import src/；删除 ddNu2 死代码并校正二阶导数</td><td style="padding:8px 10px;border:1px solid #2a3348;">单一数据源，消除漂移风险</td></tr>
+    <tr><td style="padding:8px 10px;border:1px solid #2a3348;color:#ffd27f;font-weight:700;">P1</td><td style="padding:8px 10px;border:1px solid #2a3348;">findAllIntersections 的 pieceBox 改用局部控制点凸包做剪枝</td><td style="padding:8px 10px;border:1px solid #2a3348;">多交点场景细分不再逐节点密集采样</td></tr>
+    <tr><td style="padding:8px 10px;border:1px solid #2a3348;color:#9aa3b5;font-weight:700;">P2</td><td style="padding:8px 10px;border:1px solid #2a3348;">Canvas HiDPI 适配；iterationHistory 可关闭；角点初值去重</td><td style="padding:8px 10px;border:1px solid #2a3348;">高分屏清晰 / 省内存 / 少冗余迭代</td></tr>
+  </table>
+</div>
+</html>

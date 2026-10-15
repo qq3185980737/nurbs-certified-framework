@@ -1,0 +1,2107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NURBS 统一数值框架几何计算系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --bg-panel: #252542;
+            --border-color: #3d3d5c;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0b0;
+            --accent-cyan: #00d9ff;
+            --accent-red: #ff6b6b;
+            --accent-gold: #ffd700;
+            --accent-purple: #a55eea;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* 主布局 */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        /* 画布区域 */
+        .canvas-area {
+            flex: 1;
+            position: relative;
+            background: var(--bg-secondary);
+        }
+        
+        #mainCanvas {
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        
+        /* 侧边面板 */
+        .side-panel {
+            width: 420px;
+            background: var(--bg-panel);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .panel-header {
+            padding: 16px 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+        
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        
+        /* 滚动条样式 */
+        .panel-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .panel-content::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+        
+        .panel-content::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        
+        /* 表单元素 */
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .form-row .form-group {
+            flex: 1;
+        }
+        
+        /* 按钮样式 */
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-cyan), #0099cc);
+            color: #000;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 217, 255, 0.3);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, var(--accent-red), #cc5555);
+            color: #fff;
+        }
+        
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 12px;
+        }
+        
+        /* 卡片样式 */
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 14px;
+            margin-bottom: 14px;
+        }
+        
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--accent-cyan);
+        }
+        
+        /* 数据仪表盘 */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        
+        .metric-item {
+            background: var(--bg-primary);
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .metric-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        
+        .metric-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            font-family: 'Courier New', monospace;
+        }
+        
+        .metric-value.warning {
+            color: var(--accent-gold);
+        }
+        
+        .metric-value.error {
+            color: var(--accent-red);
+        }
+        
+        /* 状态指示器 */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-intersection {
+            background: rgba(255, 215, 0, 0.2);
+            color: var(--accent-gold);
+            border: 1px solid var(--accent-gold);
+        }
+        
+        .status-separated {
+            background: rgba(165, 94, 234, 0.2);
+            color: var(--accent-purple);
+            border: 1px solid var(--accent-purple);
+        }
+        
+        .status-tangent {
+            background: rgba(255, 159, 67, 0.2);
+            color: var(--accent-gold);
+            border: 1px solid var(--accent-gold);
+        }
+        
+        .status-undetermined {
+            background: rgba(160, 160, 176, 0.2);
+            color: var(--text-secondary);
+            border: 1px solid var(--text-secondary);
+        }
+        
+        /* 控制点列表 */
+        .control-point-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+        
+        .control-point-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid var(--border-color);
+            gap: 8px;
+        }
+        
+        .control-point-item:last-child {
+            border-bottom: none;
+        }
+        
+        .control-point-index {
+            width: 24px;
+            height: 24px;
+            background: var(--accent-cyan);
+            color: #000;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .control-point-inputs {
+            flex: 1;
+            display: flex;
+            gap: 6px;
+        }
+        
+        .control-point-inputs input {
+            width: 60px;
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        
+        /* 场景选择器 */
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        
+        .scenario-btn {
+            padding: 10px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+        
+        .scenario-btn:hover {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 217, 255, 0.1);
+        }
+        
+        .scenario-btn.active {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 217, 255, 0.15);
+        }
+        
+        /* 迭代历史 */
+        .iteration-log {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            background: var(--bg-primary);
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .iteration-log-item {
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        /* 标签页 */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            color: var(--text-secondary);
+        }
+        
+        .tab:hover {
+            color: var(--text-primary);
+        }
+        
+        .tab.active {
+            color: var(--accent-cyan);
+            border-bottom-color: var(--accent-cyan);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* 工具提示 */
+        .tooltip {
+            position: relative;
+        }
+        
+        .tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 6px 10px;
+            background: #000;
+            color: #fff;
+            font-size: 11px;
+            border-radius: 4px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        
+        .tooltip:hover::after {
+            opacity: 1;
+        }
+        
+        /* Toast 动画 */
+        @keyframes slideUp {
+            from {
+                transform: translateX(-50%) translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideDown {
+            from {
+                transform: translateY(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        /* 顶部工具栏 */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .toolbar-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            margin-right: auto;
+        }
+        
+        /* 响应式调整 */
+        @media (max-width: 1200px) {
+            .side-panel {
+                width: 360px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部工具栏 -->
+    <div class="toolbar">
+        <div class="toolbar-title">🔷 NURBS 统一数值框架几何计算系统</div>
+        <button class="btn btn-primary" id="btnCompute">▶ 执行计算</button>
+        <button class="btn btn-secondary" id="btnFitView">🔍 适应视图</button>
+        <button class="btn btn-secondary" id="btnReset">↺ 重置</button>
+        <button class="btn btn-secondary" id="btnDownload">⬇ 导出数据</button>
+    </div>
+    
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 画布区域 -->
+        <div class="canvas-area">
+            <canvas id="mainCanvas"></canvas>
+        </div>
+        
+        <!-- 右侧面板 -->
+        <div class="side-panel">
+            <!-- 标签页导航 -->
+            <div class="tabs">
+                <div class="tab active" data-tab="curve1">曲线 1</div>
+                <div class="tab" data-tab="curve2">曲线 2</div>
+                <div class="tab" data-tab="results">结果</div>
+                <div class="tab" data-tab="scenarios">场景</div>
+            </div>
+            
+            <!-- 曲线 1 配置 -->
+            <div class="panel-content tab-content active" id="tab-curve1">
+                <div class="card">
+                    <div class="card-title">基本参数</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">阶数 (Degree)</label>
+                            <input type="number" class="form-input" id="curve1Degree" value="3" min="1" max="10">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">控制点数</label>
+                            <input type="number" class="form-input" id="curve1ControlPoints" value="6" min="2" readonly>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Knot 类型</label>
+                            <select class="form-input" id="curve1KnotType">
+                                <option value="clamped">Clamped</option>
+                                <option value="uniform">Uniform</option>
+                                <option value="bezier">Bezier</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <button class="btn btn-secondary btn-sm" id="curve1AddPoint">+ 添加控制点</button>
+                        <button class="btn btn-secondary btn-sm" id="curve1RemovePoint">- 移除控制点</button>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">控制点坐标</div>
+                    <div class="control-point-list" id="curve1ControlPointsList"></div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">权重设置</div>
+                    <div class="control-point-list" id="curve1WeightsList"></div>
+                </div>
+            </div>
+            
+            <!-- 曲线 2 配置 -->
+            <div class="panel-content tab-content" id="tab-curve2">
+                <div class="card">
+                    <div class="card-title">基本参数</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">阶数 (Degree)</label>
+                            <input type="number" class="form-input" id="curve2Degree" value="3" min="1" max="10">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">控制点数</label>
+                            <input type="number" class="form-input" id="curve2ControlPoints" value="6" min="2" readonly>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Knot 类型</label>
+                            <select class="form-input" id="curve2KnotType">
+                                <option value="clamped">Clamped</option>
+                                <option value="uniform">Uniform</option>
+                                <option value="bezier">Bezier</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <button class="btn btn-secondary btn-sm" id="curve2AddPoint">+ 添加控制点</button>
+                        <button class="btn btn-secondary btn-sm" id="curve2RemovePoint">- 移除控制点</button>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">控制点坐标</div>
+                    <div class="control-point-list" id="curve2ControlPointsList"></div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">权重设置</div>
+                    <div class="control-point-list" id="curve2WeightsList"></div>
+                </div>
+            </div>
+            
+            <!-- 计算结果 -->
+            <div class="panel-content tab-content" id="tab-results">
+                <div class="card">
+                    <div class="card-title">几何状态</div>
+                    <div style="text-align: center; padding: 20px;">
+                        <span class="status-badge status-undetermined" id="geoStatus">未计算</span>
+                    </div>
+                    <p class="form-label" style="text-align: center; margin-top: 10px;" id="geoMessage">-</p>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">计算结果</div>
+                    <div class="dashboard-grid">
+                        <div class="metric-item">
+                            <div class="metric-label">参数 u</div>
+                            <div class="metric-value" id="resultU">-</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">参数 v</div>
+                            <div class="metric-value" id="resultV">-</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">距离</div>
+                            <div class="metric-value" id="resultDistance">-</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">残差</div>
+                            <div class="metric-value" id="resultResidual">-</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">迭代次数</div>
+                            <div class="metric-value" id="resultIterations">-</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">耗时 (ms)</div>
+                            <div class="metric-value" id="resultTime">-</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 14px;">
+                        <div class="form-label">交点/最近点坐标</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">曲线 1 点</label>
+                                <input type="text" class="form-input" id="resultPoint1" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">曲线 2 点</label>
+                                <input type="text" class="form-input" id="resultPoint2" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">迭代历史</div>
+                    <div class="iteration-log" id="iterationLog">
+                        <div class="form-label" style="text-align: center;">暂无数据</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 测试场景 -->
+            <div class="panel-content tab-content" id="tab-scenarios">
+                <div class="card">
+                    <div class="card-title">预设场景</div>
+                    <div class="scenario-grid">
+                        <button class="scenario-btn" data-scenario="intersect1">✚ 普通相交</button>
+                        <button class="scenario-btn" data-scenario="intersect2">✚✚ 多点相交</button>
+                        <button class="scenario-btn" data-scenario="tangent1">⌒ 相切接触</button>
+                        <button class="scenario-btn" data-scenario="tangent2">⌒ 高阶相切</button>
+                        <button class="scenario-btn" data-scenario="separated1">⊘ 远距离分离</button>
+                        <button class="scenario-btn" data-scenario="separated2">⊚ 近距离平行</button>
+                        <button class="scenario-btn" data-scenario="endpoint">● 端点接触</button>
+                        <button class="scenario-btn" data-scenario="circle">◯ 圆与曲线</button>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">求解器配置</div>
+                    <div class="form-group">
+                        <label class="form-label">网格采样密度</label>
+                        <input type="range" class="form-input" id="gridDensity" min="3" max="15" value="7">
+                        <div style="font-size: 11px; color: var(--text-secondary); text-align: right;" id="gridDensityValue">7×7</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">最大迭代次数</label>
+                        <input type="number" class="form-input" id="maxIterations" value="100" min="10" max="1000">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">收敛容差</label>
+                        <select class="form-input" id="convergenceTolerance">
+                            <option value="1e-6">1e-6 (宽松)</option>
+                            <option value="1e-8" selected>1e-8 (标准)</option>
+                            <option value="1e-10">1e-10 (严格)</option>
+                            <option value="1e-12">1e-12 (极严)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">
+                            <input type="checkbox" id="usePreFiltering" checked> 启用包围盒预筛选
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">批量测试</div>
+                    <button class="btn btn-secondary" style="width: 100%;" id="btnBatchTest">运行压力测试</button>
+                    <div class="form-label" style="margin-top: 10px;" id="batchTestResult"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- C++/WASM 数学核（MODULARIZE 工厂，暴露全局 createNurbsModule）；须在 build bundle 之前加载 -->
+    <script src="cpp/wasm/nurbs.js"></script>
+
+    <script>
+        // ============================================================================
+        // WASM 数学后端 + 渲染引擎 + 诊断 —— 由 build.mjs 从 src/ 自动生成，禁止手改。
+        // 数学核单一事实来源：cpp/src/*.cpp（经 cpp/wasm/nurbs.wasm 供浏览器调用）；
+        // 接入层：src/wasm_backend.js + src/render/canvas_engine.js + src/diagnostics.js
+        // 修改数值/求解逻辑请编辑 cpp/src 后重建 WASM（见 cpp/wasm/README.md）；
+        // 修改接入/渲染逻辑请编辑 src/ 后运行 `node build.mjs` 重新生成本段。
+        // ============================================================================
+(function () {
+    'use strict';
+    const __Nurbs = {};
+// ---- module: NURBS 统一数值框架几何计算系统/src/wasm_backend.js ----
+// ============================================================================
+// wasm_backend.js — 前端 WASM 数学后端（单源化接入层）
+// ----------------------------------------------------------------------------
+// 用 C++ 编译的 nurbs.wasm（cpp/wasm/nurbs.js + nurbs.wasm，MODULARIZE 工厂
+// createNurbsModule）提供全部数值核，替换旧 JS 版 math_core + unified_solver。
+// 暴露与旧数学核完全相同的顶层 API（createCurve / evaluatePoint / evaluatePoints
+// / computeAABB / unifiedSolve / findAllIntersections / GeometryState），内部转发
+// 到 WASM，从而让浏览器与 C++ 共享同一套算法（单源）。
+//
+// 环境无关：浏览器经 `<script src="cpp/wasm/nurbs.js">` 暴露全局 createNurbsModule；
+// Node 测试可把工厂函数传入 initWasm(factory)。
+// 由 build.mjs 内联进 index.html；本文件是唯一事实来源。
+// ============================================================================
+
+// ---- UI 工具：Knot 向量生成（纯 JS，非数值核；自 math_core.js 提取保留） ----
+function generateUniformKnotVector(n, p) {
+    const m = n + p; // Knot 向量索引上限
+    const knots = new Array(m + 1);
+    // 首尾重节点 (clamped)
+    for (let i = 0; i <= p; i++) knots[i] = 0;
+    for (let i = m - p; i <= m; i++) knots[i] = 1;
+    // 中间均匀分布（内部节点数 = n-p-1）
+    const internalKnotCount = n - p - 1;
+    if (internalKnotCount > 0) {
+        const step = 1 / (internalKnotCount + 1);
+        for (let i = 1; i <= internalKnotCount; i++) knots[p + i] = i * step;
+    }
+    return knots;
+}
+
+function generatePiecewiseBezierKnotVector(n, p) {
+    const segments = n - p; // 贝塞尔段数
+    if (segments <= 0) throw new Error('控制点数量不足以生成分段贝兹曲线');
+    const knots = [];
+    for (let i = 0; i <= p; i++) knots.push(0);
+    for (let i = 1; i < segments; i++) {
+        const u = i / segments;
+        for (let j = 0; j < p; j++) knots.push(u);
+    }
+    for (let i = 0; i <= p; i++) knots.push(1);
+    return knots;
+}
+
+function generateKnotVector(degree, numControlPoints, knotType = 'clamped') {
+    switch (knotType.toLowerCase()) {
+        case 'uniform':
+        case 'clamped':
+            return generateUniformKnotVector(numControlPoints, degree);
+        case 'bezier':
+            return generatePiecewiseBezierKnotVector(numControlPoints, degree);
+        default:
+            console.warn(`未知的 Knot 类型 "${knotType}"，使用默认 clamped`);
+            return generateUniformKnotVector(numControlPoints, degree);
+    }
+}
+
+// ---- WASM 模块 / 曲线句柄管理 ----
+let mod = null;
+let wasmReadyPromise = null;
+const curveCache = new WeakMap(); // curve -> {handle, knotsRef, weightsRef, ctrlRef, degree}
+
+function initWasm(factory) {
+    if (wasmReadyPromise) return wasmReadyPromise;
+    wasmReadyPromise = (async () => {
+        const f = factory || (typeof globalThis !== 'undefined' ? globalThis.createNurbsModule : null);
+        if (typeof f !== 'function')
+            throw new Error('createNurbsModule 不可用：请先通过 <script src="cpp/wasm/nurbs.js"> 加载 WASM');
+        mod = await f();
+        if (!mod || typeof mod._nurbs_curve_create !== 'function')
+            throw new Error('WASM 模块初始化失败：导出缺失');
+        return mod;
+    })();
+    return wasmReadyPromise;
+}
+
+function needMod() {
+    if (!mod) throw new Error('WASM 数学核尚未初始化：请在 init() 中先 await initWasm()');
+    return mod;
+}
+
+// 曲线句柄（懒建；跟随 knots/weights/degree 引用变更自动重建，兼容 UI 原地替换 knots）
+function curveHandle(curve) {
+    const m = needMod();
+    let entry = curveCache.get(curve);
+    if (entry && entry.knotsRef === curve.knots && entry.weightsRef === curve.weights
+        && entry.ctrlRef === curve.controlPoints && entry.degree === curve.degree) {
+        return entry.handle;
+    }
+    if (entry && entry.handle) m._nurbs_curve_destroy(entry.handle);
+    const n = curve.controlPoints.length;
+    const nk = curve.knots.length;
+    const cp = m._malloc(n * 3 * 8), kn = m._malloc(nk * 8);
+    const c = cp / 8, k = kn / 8;
+    for (let i = 0; i < n; i++) {
+        m.HEAPF64[c + i * 3] = curve.controlPoints[i].x;
+        m.HEAPF64[c + i * 3 + 1] = curve.controlPoints[i].y;
+        m.HEAPF64[c + i * 3 + 2] = curve.controlPoints[i].w;
+    }
+    for (let i = 0; i < nk; i++) m.HEAPF64[k + i] = curve.knots[i];
+    const out = m._malloc(8);
+    const rc = m._nurbs_curve_create(cp, n, kn, nk, curve.degree, out);
+    const handle = m.HEAPU32[out >> 2];
+    m._free(cp); m._free(kn); m._free(out);
+    if (rc !== 0) throw new Error('WASM 曲线创建失败 rc=' + rc);
+    curveCache.set(curve, { handle, knotsRef: curve.knots, weightsRef: curve.weights, ctrlRef: curve.controlPoints, degree: curve.degree });
+    return handle;
+}
+
+// ---- 公共 API（与原 math_core + unified_solver 同名同结构） ----
+function createCurve(controlPoints, weights, knots, degree) {
+    if (controlPoints.length !== weights.length)
+        throw new Error('控制点数量必须与权重数量一致');
+    const uMin = knots[degree];
+    const uMax = knots[knots.length - 1 - degree];
+    const weightedPoints = controlPoints.map((pt, i) => ({ x: pt.x, y: pt.y, w: weights[i] }));
+    return { controlPoints: weightedPoints, weights, knots, degree, uMin, uMax };
+}
+
+function evaluatePoint(curve, u) {
+    const m = needMod();
+    const h = curveHandle(curve);
+    const out = m._malloc(16);
+    const rc = m._nurbs_evaluate_point(h, u, out, out + 8);
+    if (rc !== 0) { m._free(out); throw new Error('WASM 求值失败 rc=' + rc); }
+    const p = { x: m.HEAPF64[out >> 3], y: m.HEAPF64[(out + 8) >> 3] };
+    m._free(out);
+    return p;
+}
+
+function evaluatePoints(curve, uValues) {
+    return uValues.map(u => evaluatePoint(curve, u));
+}
+
+function computeAABB(curve) {
+    // NURBS 位于控制点凸包内：用控制点包围盒（含首末点）覆盖整条曲线，供视图适配
+    const pts = curve.controlPoints;
+    if (pts.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pts) {
+        if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+    }
+    return { minX, minY, maxX, maxY };
+}
+
+const STATE_STR = ['INTERSECTION', 'TANGENT', 'SEPARATED', 'COINCIDENT', 'UNDETERMINED'];
+
+const GeometryState = {
+    INTERSECTION: 'INTERSECTION',
+    TANGENT: 'TANGENT',
+    SEPARATED: 'SEPARATED',
+    COINCIDENT: 'COINCIDENT',
+    UNDETERMINED: 'UNDETERMINED'
+};
+
+// NurbsSolveResult 布局（C 结构，72B/条）：
+//   state i32@0, pad, u@8, v@16, p1x@24, p1y@32, p2x@40, p2y@48, distance@56, iterations i32@64, converged i32@68
+function readSolveResult(m, base) {
+    return {
+        state: STATE_STR[m.HEAPU32[base >> 2]] || 'UNDETERMINED',
+        u: m.HEAPF64[(base + 8) >> 3],
+        v: m.HEAPF64[(base + 16) >> 3],
+        point1: { x: m.HEAPF64[(base + 24) >> 3], y: m.HEAPF64[(base + 32) >> 3] },
+        point2: { x: m.HEAPF64[(base + 40) >> 3], y: m.HEAPF64[(base + 48) >> 3] },
+        distance: m.HEAPF64[(base + 56) >> 3],
+        iterations: m.HEAPU32[(base + 64) >> 2],
+        converged: m.HEAPU32[(base + 68) >> 2]
+    };
+}
+
+// options: {usePreFiltering, gridSize, maxIterations, tolerance} —— 与 C API
+// nurbs_unified_solve_ex 一一对应（equivalence 已证 JS/C++ 同参数逐位一致）
+function unifiedSolve(curve1, curve2, options = {}) {
+    const m = needMod();
+    const h1 = curveHandle(curve1), h2 = curveHandle(curve2);
+    const usePreFiltering = options.usePreFiltering !== undefined ? (options.usePreFiltering ? 1 : 0) : 1;
+    const gridSize = options.gridSize !== undefined ? options.gridSize : 6;
+    const maxIterations = options.maxIterations !== undefined ? options.maxIterations : 80;
+    const tolerance = options.tolerance !== undefined ? options.tolerance : 0;
+    const resPtr = m._malloc(8), nPtr = m._malloc(4);
+    const rc = m._nurbs_unified_solve_ex(h1, h2, usePreFiltering, gridSize, maxIterations,
+        tolerance, resPtr, nPtr);
+    const n = m.HEAPU32[nPtr >> 2], res = m.HEAPU32[resPtr >> 2];
+    const results = [];
+    if (rc === 0 && n >= 1) {
+        for (let i = 0; i < n; i++) results.push(readSolveResult(m, res + i * 72));
+    } else if (rc !== 0) {
+        m._free(resPtr); m._free(nPtr);
+        throw new Error('WASM 求解失败 rc=' + rc);
+    }
+    if (n >= 1) m._nurbs_solve_results_free(res);
+    m._free(resPtr); m._free(nPtr);
+    return results;
+}
+
+// NurbsRoot 布局（C 结构，64B/条）：
+//   u@0, v@8, distance@16, p1x@24, p1y@32, p2x@40, p2y@48, iterations i32@56
+// C 侧 find_all 固定容差 1e-8（无 tolerance 入参）；前端 options.tolerance 不生效，以 C++ 为准
+function findAllIntersections(curve1, curve2, options = {}) {
+    const m = needMod();
+    const h1 = curveHandle(curve1), h2 = curveHandle(curve2);
+    const rootsPtr = m._malloc(8), nPtr = m._malloc(4);
+    const rc = m._nurbs_find_all_intersections(h1, h2, rootsPtr, nPtr);
+    const n = m.HEAPU32[nPtr >> 2], roots = m.HEAPU32[rootsPtr >> 2];
+    const out = [];
+    if (rc === 0 && n >= 1) {
+        for (let i = 0; i < n; i++) {
+            const base = roots + i * 64;
+            out.push({
+                u: m.HEAPF64[base >> 3],
+                v: m.HEAPF64[(base + 8) >> 3],
+                distance: m.HEAPF64[(base + 16) >> 3],
+                point1: { x: m.HEAPF64[(base + 24) >> 3], y: m.HEAPF64[(base + 32) >> 3] },
+                point2: { x: m.HEAPF64[(base + 40) >> 3], y: m.HEAPF64[(base + 48) >> 3] },
+                iterations: m.HEAPU32[(base + 56) >> 2]
+            });
+        }
+    } else if (rc !== 0) {
+        m._free(rootsPtr); m._free(nPtr);
+        throw new Error('WASM 全交点求解失败 rc=' + rc);
+    }
+    if (n >= 1) m._nurbs_roots_free(roots);
+    m._free(rootsPtr); m._free(nPtr);
+    return out;
+}
+
+
+// ---- module: src/render/canvas_engine.js ----
+// ============================================================================
+// Canvas 渲染引擎 —— UI 使用的规范渲染器（由 index.html 内联副本迁出，单一事实来源）
+// 由 build.mjs 打包注入 index.html；改动此处后运行 `node build.mjs` 同步到浏览器。
+// 依赖：math_core(求值/AABB) + solver(GeometryState)
+// ============================================================================
+// 依赖：wasm_backend(求值/AABB/GeometryState，转发到 C++ WASM 数学核)
+
+
+const COLORS = {
+    background: '#1a1a2e', grid: '#2d2d44', gridMajor: '#3d3d5c', axis: '#4a4a6a',
+    curve1: '#00d9ff', curve2: '#ff6b6b', controlPolygon1: 'rgba(0, 217, 255, 0.3)',
+    controlPolygon2: 'rgba(255, 107, 107, 0.3)', controlPoint1: '#00a8cc', controlPoint2: '#ff5252',
+    intersection: '#ffd700', text: '#e0e0e0'
+};
+
+class Viewport {
+    constructor(width, height) {
+        this.width = width; this.height = height;
+        this.zoom = 1.0;
+        this.offsetX = width / 2; this.offsetY = height / 2;
+    }
+    
+    worldToScreen(wx, wy) {
+        return { x: wx * this.zoom + this.offsetX, y: -wy * this.zoom + this.offsetY };
+    }
+    
+    screenToWorld(sx, sy) {
+        return { x: (sx - this.offsetX) / this.zoom, y: -(sy - this.offsetY) / this.zoom };
+    }
+    
+    fitToBounds(bounds, padding = 0.1) {
+        const rangeX = bounds.maxX - bounds.minX || 1;
+        const rangeY = bounds.maxY - bounds.minY || 1;
+        const scaleX = (this.width * (1 - 2 * padding)) / rangeX;
+        const scaleY = (this.height * (1 - 2 * padding)) / rangeY;
+        this.zoom = Math.min(scaleX, scaleY);
+        const centerX = (bounds.minX + bounds.maxX) / 2;
+        const centerY = (bounds.minY + bounds.maxY) / 2;
+        this.offsetX = this.width / 2 - centerX * this.zoom;
+        this.offsetY = this.height / 2 + centerY * this.zoom;
+    }
+}
+
+class CanvasEngine {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.viewport = new Viewport(canvas.width, canvas.height);
+        this._rafId = null;
+        this.setupEventListeners();
+        this._applyHiDPI();
+    }
+    
+    // HiDPI：canvas 后台缓冲 = CSS 像素 × devicePixelRatio，绘制坐标保持 CSS 像素
+    _applyHiDPI() {
+        const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+        if (dpr <= 1) return;
+        const rect = this.canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const w = Math.round(rect.width * dpr);
+        const h = Math.round(rect.height * dpr);
+        if (this.canvas.width !== w) this.canvas.width = w;
+        if (this.canvas.height !== h) this.canvas.height = h;
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    
+    // rAF 合并重绘：滚轮/拖拽等高频事件在一帧内只重绘一次，避免每次事件全量渲染卡顿
+    requestRender() {
+        if (this._rafId != null) return;
+        this._rafId = requestAnimationFrame(() => {
+            this._rafId = null;
+            this.render();
+        });
+    }
+    
+    setupEventListeners() {
+        const canvas = this.canvas;
+        let isDragging = false, lastX = 0, lastY = 0;
+        
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            this.viewport.zoom = Math.max(0.01, Math.min(100, this.viewport.zoom * delta));
+            this.requestRender();
+        }, { passive: false });
+        
+        canvas.addEventListener('mousedown', (e) => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                this.viewport.offsetX += e.clientX - lastX;
+                this.viewport.offsetY += e.clientY - lastY;
+                lastX = e.clientX; lastY = e.clientY;
+                this.requestRender();
+            }
+        });
+        canvas.addEventListener('mouseup', () => { isDragging = false; });
+        
+        window.addEventListener('resize', () => {
+            const rect = canvas.getBoundingClientRect();
+            this._applyHiDPI();
+            this.viewport.width = rect.width; this.viewport.height = rect.height;
+            this.viewport.offsetX = rect.width / 2; this.viewport.offsetY = rect.height / 2;
+            this.requestRender();
+        });
+    }
+    
+    clear() {
+        this.ctx.fillStyle = COLORS.background;
+        this.ctx.fillRect(0, 0, this.viewport.width, this.viewport.height);
+    }
+    
+    drawGrid() {
+        const ctx = this.ctx, vp = this.viewport;
+        ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 1;
+        const topLeft = vp.screenToWorld(0, 0);
+        const bottomRight = vp.screenToWorld(vp.width, vp.height);
+        const gridSize = vp.zoom > 5 ? 0.5 : vp.zoom > 2 ? 1 : vp.zoom < 0.5 ? 5 : 1;
+        
+        ctx.beginPath();
+        for (let x = Math.floor(topLeft.x / gridSize) * gridSize; x <= bottomRight.x; x += gridSize) {
+            const s = vp.worldToScreen(x, 0);
+            ctx.moveTo(s.x, 0); ctx.lineTo(s.x, vp.height);
+        }
+        for (let y = Math.floor(bottomRight.y / gridSize) * gridSize; y <= topLeft.y; y += gridSize) {
+            const s = vp.worldToScreen(0, y);
+            ctx.moveTo(0, s.y); ctx.lineTo(vp.width, s.y);
+        }
+        ctx.stroke();
+        
+        ctx.strokeStyle = COLORS.axis; ctx.lineWidth = 2; ctx.beginPath();
+        const xAxis = vp.worldToScreen(0, 0);
+        ctx.moveTo(0, xAxis.y); ctx.lineTo(vp.width, xAxis.y);
+        const yAxis = vp.worldToScreen(0, 0);
+        ctx.moveTo(yAxis.x, 0); ctx.lineTo(yAxis.x, vp.height);
+        ctx.stroke();
+    }
+    
+    drawCurve(curve, color) {
+        const ctx = this.ctx, vp = this.viewport;
+        const points = [];
+        const steps = Math.max(50, curve.controlPoints.length * 20);
+        for (let i = 0; i <= steps; i++) {
+            const u = curve.uMin + (curve.uMax - curve.uMin) * i / steps;
+            try { points.push(evaluatePoint(curve, u)); } catch(e) {}
+        }
+        if (points.length === 0) return;
+        
+        ctx.beginPath();
+        const start = vp.worldToScreen(points[0].x, points[0].y);
+        ctx.moveTo(start.x, start.y);
+        for (let i = 1; i < points.length; i++) {
+            const s = vp.worldToScreen(points[i].x, points[i].y);
+            ctx.lineTo(s.x, s.y);
+        }
+        ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+    }
+    
+    drawControlPolygon(curve, color) {
+        const ctx = this.ctx, vp = this.viewport;
+        ctx.beginPath();
+        const start = vp.worldToScreen(curve.controlPoints[0].x, curve.controlPoints[0].y);
+        ctx.moveTo(start.x, start.y);
+        for (let i = 1; i < curve.controlPoints.length; i++) {
+            const s = vp.worldToScreen(curve.controlPoints[i].x, curve.controlPoints[i].y);
+            ctx.lineTo(s.x, s.y);
+        }
+        ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    
+    drawControlPoints(curve, color) {
+        const ctx = this.ctx, vp = this.viewport;
+        for (let i = 0; i < curve.controlPoints.length; i++) {
+            const pt = curve.controlPoints[i];
+            const s = vp.worldToScreen(pt.x, pt.y);
+            ctx.beginPath(); ctx.arc(s.x, s.y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = color; ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+        }
+    }
+    
+    drawResult(result) {
+        const ctx = this.ctx, vp = this.viewport;
+        const s1 = vp.worldToScreen(result.point1.x, result.point1.y);
+        
+        ctx.beginPath(); ctx.arc(s1.x, s1.y, 10, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.3)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(s1.x, s1.y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = COLORS.intersection; ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+        
+        if (result.state === GeometryState.SEPARATED && result.point2) {
+            const s2 = vp.worldToScreen(result.point2.x, result.point2.y);
+            ctx.beginPath(); ctx.moveTo(s1.x, s1.y); ctx.lineTo(s2.x, s2.y);
+            ctx.strokeStyle = '#a55eea'; ctx.lineWidth = 2; ctx.setLineDash([5, 3]); ctx.stroke(); ctx.setLineDash([]);
+        }
+    }
+    
+    render(curve1 = null, curve2 = null, results = []) {
+        this.clear();
+        this.drawGrid();
+        if (curve1) {
+            this.drawControlPolygon(curve1, COLORS.controlPolygon1);
+            this.drawCurve(curve1, COLORS.curve1);
+            this.drawControlPoints(curve1, COLORS.controlPoint1);
+        }
+        if (curve2) {
+            this.drawControlPolygon(curve2, COLORS.controlPolygon2);
+            this.drawCurve(curve2, COLORS.curve2);
+            this.drawControlPoints(curve2, COLORS.controlPoint2);
+        }
+        for (const result of results) { this.drawResult(result); }
+    }
+    
+    fitCurves(curve1, curve2) {
+        const box1 = computeAABB(curve1), box2 = computeAABB(curve2);
+        const combinedBox = {
+            minX: Math.min(box1.minX, box2.minX),
+            minY: Math.min(box1.minY, box2.minY),
+            maxX: Math.max(box1.maxX, box2.maxX),
+            maxY: Math.max(box1.maxY, box2.maxY)
+        };
+        this.viewport.fitToBounds(combinedBox, 0.15);
+        this.render(curve1, curve2, []);
+    }
+}
+
+// ============================================================================
+// 导出
+// ============================================================================
+
+
+
+// ---- module: NURBS 统一数值框架几何计算系统/src/diagnostics.js ----
+/**
+ * Diagnostics Module - 全局错误监控与诊断增强
+ * 
+ * 提供应用启动时的健康检查、错误捕获和 UI 提示功能。
+ */
+
+
+
+/**
+ * 初始化全局错误监控
+ */
+function initDiagnostics() {
+    const errorContainer = createErrorContainer();
+    
+    // 捕获未处理的异常
+    window.onerror = function(message, source, lineno, colno, error) {
+        const errorInfo = {
+            type: 'JavaScript Error',
+            message: message,
+            source: source,
+            line: lineno,
+            column: colno,
+            stack: error ? error.stack : 'N/A'
+        };
+        displayError(errorInfo, errorContainer);
+        console.error('[DIAGNOSTICS] Global Error:', errorInfo);
+        return false;
+    };
+    
+    // 捕获未处理的 Promise 拒绝
+    window.onunhandledrejection = function(event) {
+        const errorInfo = {
+            type: 'Unhandled Promise Rejection',
+            reason: event.reason,
+            message: event.reason ? event.reason.message || String(event.reason) : 'Unknown reason'
+        };
+        displayError(errorInfo, errorContainer);
+        console.error('[DIAGNOSTICS] Unhandled Rejection:', errorInfo);
+    };
+    
+    console.log('[DIAGNOSTICS] Global error monitoring initialized');
+}
+
+/**
+ * 创建错误通知容器
+ */
+function createErrorContainer() {
+    let container = document.getElementById('error-notification-container');
+    
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'error-notification-container';
+        container.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 9999;
+            pointer-events: none;
+        `;
+        document.body.appendChild(container);
+    }
+    
+    return container;
+}
+
+/**
+ * 在 UI 上显示错误信息
+ */
+function displayError(errorInfo, container) {
+    const alertBox = document.createElement('div');
+    alertBox.style.cssText = `
+        background: linear-gradient(135deg, #cc5555, #ff6b6b);
+        color: #fff;
+        padding: 12px 20px;
+        margin: 10px;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+        font-family: 'Segoe UI', sans-serif;
+        font-size: 13px;
+        pointer-events: auto;
+        cursor: pointer;
+        animation: slideDown 0.3s ease-out;
+    `;
+    
+    alertBox.innerHTML = `
+        <div style="font-weight: 700; margin-bottom: 6px;">⚠️ ${errorInfo.type}</div>
+        <div style="font-family: 'Courier New', monospace; font-size: 12px; opacity: 0.9;">
+            ${escapeHtml(errorInfo.message)}
+        </div>
+        ${errorInfo.source ? `<div style="font-size: 11px; opacity: 0.7; margin-top: 4px;">📍 ${errorInfo.source}:${errorInfo.line}:${errorInfo.column}</div>` : ''}
+        <div style="margin-top: 8px; font-size: 11px; opacity: 0.6;">点击关闭</div>
+    `;
+    
+    alertBox.addEventListener('click', () => {
+        alertBox.remove();
+    });
+    
+    container.appendChild(alertBox);
+    
+    // 自动移除（5 秒后）
+    setTimeout(() => {
+        if (alertBox.parentNode) {
+            alertBox.remove();
+        }
+    }, 10000);
+}
+
+/**
+ * HTML 转义
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+/**
+ * 模块加载健康检查
+ */
+async  function checkModuleHealth() {
+    const healthReport = {
+        modules: {},
+        allLoaded: true,
+        errors: []
+    };
+    
+    const modulesToCheck = [
+        { name: 'math_core', path: './nurbs/math_core.js' },
+        { name: 'canvas_engine', path: './render/canvas_engine.js' },
+        { name: 'unified_solver', path: './solver/unified_solver.js' }
+    ];
+    
+    for (const mod of modulesToCheck) {
+        try {
+            await import(mod.path);
+            healthReport.modules[mod.name] = { status: 'OK', loaded: true };
+            console.log(`[HEALTH CHECK] ✅ ${mod.name} loaded successfully`);
+        } catch (error) {
+            healthReport.modules[mod.name] = { 
+                status: 'FAILED', 
+                loaded: false, 
+                error: error.message 
+            };
+            healthReport.allLoaded = false;
+            healthReport.errors.push({
+                module: mod.name,
+                message: error.message
+            });
+            console.error(`[HEALTH CHECK] ❌ ${mod.name} failed to load:`, error.message);
+        }
+    }
+    
+    return healthReport;
+}
+
+/**
+ * Canvas 上下文检查
+ */
+function checkCanvasContext(canvas) {
+    if (!canvas) {
+        return {
+            success: false,
+            error: 'Canvas 元素未找到'
+        };
+    }
+    
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) {
+        return {
+            success: false,
+            error: '无法获取 Canvas 2D 上下文'
+        };
+    }
+    
+    return {
+        success: true,
+        context: ctx,
+        width: canvas.width,
+        height: canvas.height
+    };
+}
+
+/**
+ * 生成诊断报告
+ */
+function generateDiagnosticReport() {
+    const report = {
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        screenResolution: `${screen.width}x${screen.height}`,
+        devicePixelRatio: window.devicePixelRatio,
+        webglSupport: checkWebGLSupport(),
+        localStorageAvailable: checkLocalStorage(),
+        modulesLoaded: true
+    };
+    
+    return report;
+}
+
+function checkWebGLSupport() {
+    try {
+        const canvas = document.createElement('canvas');
+        return !!(window.WebGLRenderingContext && 
+                  (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+    } catch (e) {
+        return false;
+    }
+}
+
+function checkLocalStorage() {
+    try {
+        const test = '__localStorage_test__';
+        localStorage.setItem(test, test);
+        localStorage.removeItem(test);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+    // ---- 导出注册（收集自各模块 export 语句）----
+        if (typeof initWasm !== 'undefined') __Nurbs.initWasm = initWasm;
+        if (typeof createCurve !== 'undefined') __Nurbs.createCurve = createCurve;
+        if (typeof evaluatePoint !== 'undefined') __Nurbs.evaluatePoint = evaluatePoint;
+        if (typeof evaluatePoints !== 'undefined') __Nurbs.evaluatePoints = evaluatePoints;
+        if (typeof computeAABB !== 'undefined') __Nurbs.computeAABB = computeAABB;
+        if (typeof unifiedSolve !== 'undefined') __Nurbs.unifiedSolve = unifiedSolve;
+        if (typeof findAllIntersections !== 'undefined') __Nurbs.findAllIntersections = findAllIntersections;
+        if (typeof GeometryState !== 'undefined') __Nurbs.GeometryState = GeometryState;
+        if (typeof CanvasEngine !== 'undefined') __Nurbs.CanvasEngine = CanvasEngine;
+        if (typeof Viewport !== 'undefined') __Nurbs.Viewport = Viewport;
+        if (typeof COLORS !== 'undefined') __Nurbs.COLORS = COLORS;
+        if (typeof initDiagnostics !== 'undefined') __Nurbs.initDiagnostics = initDiagnostics;
+        if (typeof checkModuleHealth !== 'undefined') __Nurbs.checkModuleHealth = checkModuleHealth;
+        if (typeof checkCanvasContext !== 'undefined') __Nurbs.checkCanvasContext = checkCanvasContext;
+        if (typeof generateDiagnosticReport !== 'undefined') __Nurbs.generateDiagnosticReport = generateDiagnosticReport;
+
+    // ---- 暴露到全局：UI 以裸全局名调用这些函数 ----
+    for (const k in __Nurbs) {
+        if (!(k in window)) window[k] = __Nurbs[k];
+    }
+
+    // ---- 诊断（错误覆盖层），调用失败不阻断应用 ----
+    try { if (typeof __Nurbs.initDiagnostics === 'function') initDiagnostics(); }
+    catch (e) { console.warn('[build] initDiagnostics skipped:', e && e.message); }
+})();
+
+let curve1 = null;
+        let curve2 = null;
+        let canvasEngine = null;
+        let currentResults = [];
+        
+        // 默认控制点
+        const defaultControlPoints1 = [
+            {x: -3, y: 2}, {x: -2, y: 3}, {x: -1, y: 1},
+            {x: 0, y: -1}, {x: 1, y: 1}, {x: 2, y: -2}
+        ];
+        
+        const defaultControlPoints2 = [
+            {x: -2, y: -2}, {x: -1, y: 1}, {x: 0, y: -1},
+            {x: 1, y: 2}, {x: 2, y: 0}, {x: 3, y: 1}
+        ];
+
+        // ========================================================================
+        // 初始化
+        // ========================================================================
+        
+        async function init() {
+            console.log('[INIT] 开始初始化应用...');
+            
+            // 先加载 WASM 数学核（createNurbsModule 来自 cpp/wasm/nurbs.js），后续求值/求解都走 C++ 单源
+            await initWasm();
+            console.log('[INIT] ✅ WASM 数学核就绪');
+            
+            const canvas = document.getElementById('mainCanvas');
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            
+            canvasEngine = new CanvasEngine(canvas);
+            console.log('[INIT] ✅ Canvas 引擎初始化完成');
+            
+            initCurve1();
+            initCurve2();
+            bindEvents();
+            updateCurves();
+            canvasEngine.fitCurves(curve1, curve2);
+            
+            console.log('[INIT] ✅ 应用初始化完成 - 本地运行模式');
+        }
+        
+        function initCurve1() {
+            const degree = parseInt(document.getElementById('curve1Degree').value);
+            const controlPoints = [...defaultControlPoints1];
+            const knotType = document.getElementById('curve1KnotType').value;
+            const knots = generateKnotVector(degree, controlPoints.length, knotType);
+            const weights = new Array(controlPoints.length).fill(1.0);
+            
+            curve1 = createCurve(controlPoints, weights, knots, degree);
+            updateControlPointsUI('curve1');
+        }
+        
+        function initCurve2() {
+            const degree = parseInt(document.getElementById('curve2Degree').value);
+            const controlPoints = [...defaultControlPoints2];
+            const knotType = document.getElementById('curve2KnotType').value;
+            const knots = generateKnotVector(degree, controlPoints.length, knotType);
+            const weights = new Array(controlPoints.length).fill(1.0);
+            
+            curve2 = createCurve(controlPoints, weights, knots, degree);
+            updateControlPointsUI('curve2');
+        }
+        
+        // ========================================================================
+        // UI 更新
+        // ========================================================================
+        
+        function updateControlPointsUI(curvePrefix) {
+            const curve = curvePrefix === 'curve1' ? curve1 : curve2;
+            const pointsList = document.getElementById(`${curvePrefix}ControlPointsList`);
+            const weightsList = document.getElementById(`${curvePrefix}WeightsList`);
+            
+            pointsList.innerHTML = '';
+            curve.controlPoints.forEach((pt, i) => {
+                const item = document.createElement('div');
+                item.className = 'control-point-item';
+                item.innerHTML = `
+                    <div class="control-point-index">${i}</div>
+                    <div class="control-point-inputs">
+                        <input type="number" step="0.1" data-type="x" data-index="${i}" 
+                               value="${pt.x.toFixed(4)}" class="form-input" style="width: 70px;">
+                        <input type="number" step="0.1" data-type="y" data-index="${i}" 
+                               value="${pt.y.toFixed(4)}" class="form-input" style="width: 70px;">
+                    </div>
+                `;
+                pointsList.appendChild(item);
+            });
+            
+            weightsList.innerHTML = '';
+            curve.weights.forEach((w, i) => {
+                const item = document.createElement('div');
+                item.className = 'control-point-item';
+                item.innerHTML = `
+                    <div class="control-point-index" style="background: var(--accent-purple);">${i}</div>
+                    <div class="control-point-inputs">
+                        <span style="font-size: 12px; color: var(--text-secondary);">W${i}:</span>
+                        <input type="number" step="0.1" min="0.001" data-weight-index="${i}" 
+                               value="${w.toFixed(4)}" class="form-input">
+                    </div>
+                `;
+                weightsList.appendChild(item);
+            });
+            
+            document.getElementById(`${curvePrefix}ControlPoints`).value = curve.controlPoints.length;
+        }
+        
+        function updateCurves() {
+            if (!curve1 || !curve2) return;
+            
+            canvasEngine.render(curve1, curve2, currentResults);
+        }
+        
+        // ========================================================================
+        // 计算逻辑
+        // ========================================================================
+        
+        function performComputation() {
+            const startTime = performance.now();
+            
+            try {
+                // 获取配置
+                const gridSize = parseInt(document.getElementById('gridDensity').value);
+                const maxIterations = parseInt(document.getElementById('maxIterations').value);
+                const tolerance = parseFloat(document.getElementById('convergenceTolerance').value);
+                const usePreFiltering = document.getElementById('usePreFiltering').checked;
+                
+                // 执行求解
+                currentResults = unifiedSolve(curve1, curve2, {
+                    usePreFiltering,
+                    gridSize,
+                    maxIterations,
+                    tolerance
+                });
+                
+                const endTime = performance.now();
+                
+                // 求容差范围内全部交点，供画布渲染多交点标记
+                const allIntersections = findAllIntersections(curve1, curve2, { tolerance });
+                
+                // 更新 UI
+                if (currentResults.length > 0) {
+                    updateResultsUI(currentResults[0], endTime - startTime);
+                }
+                
+                // 重绘：相交时渲染全部交点，分离/无交点时渲染最近点结果
+                const renderResults = allIntersections.length > 0 ? allIntersections : currentResults;
+                canvasEngine.render(curve1, curve2, renderResults);
+                
+            } catch (error) {
+                console.error('计算错误:', error);
+                alert(`计算过程中发生错误：${error.message}`);
+            }
+        }
+        
+        function updateResultsUI(result, computeTime) {
+            // 状态徽章
+            const statusEl = document.getElementById('geoStatus');
+            statusEl.className = 'status-badge';
+            
+            switch (result.state) {
+                case GeometryState.INTERSECTION:
+                    statusEl.classList.add('status-intersection');
+                    statusEl.textContent = '相交';
+                    break;
+                case GeometryState.TANGENT:
+                    statusEl.classList.add('status-tangent');
+                    statusEl.textContent = '相切';
+                    break;
+                case GeometryState.SEPARATED:
+                    statusEl.classList.add('status-separated');
+                    statusEl.textContent = '分离';
+                    break;
+                default:
+                    statusEl.classList.add('status-undetermined');
+                    statusEl.textContent = '未定';
+            }
+            
+            document.getElementById('geoMessage').textContent = result.message;
+            
+            // 指标数据
+            document.getElementById('resultU').textContent = result.u.toFixed(8);
+            document.getElementById('resultV').textContent = result.v.toFixed(8);
+            document.getElementById('resultDistance').textContent = result.distance.toExponential(6);
+            document.getElementById('resultResidual').textContent = result.residual.toExponential(8);
+            document.getElementById('resultIterations').textContent = result.iterations;
+            document.getElementById('resultTime').textContent = computeTime.toFixed(2);
+            
+            // 坐标
+            document.getElementById('resultPoint1').value = 
+                `(${result.point1.x.toFixed(6)}, ${result.point1.y.toFixed(6)})`;
+            document.getElementById('resultPoint2').value = 
+                `(${result.point2.x.toFixed(6)}, ${result.point2.y.toFixed(6)})`;
+            
+            // 迭代历史
+            const logEl = document.getElementById('iterationLog');
+            if (result.iterationHistory && result.iterationHistory.length > 0) {
+                logEl.innerHTML = result.iterationHistory.map((iter, i) => `
+                    <div class="iteration-log-item">
+                        <span style="color: var(--text-secondary);">[${String(iter.iteration).padStart(3, '0')}]</span>
+                        u=${iter.u.toFixed(6)}, v=${iter.v.toFixed(6)}, 
+                        d=${iter.distance.toExponential(4)}
+                    </div>
+                `).join('');
+            } else {
+                logEl.innerHTML = '<div class="form-label" style="text-align: center;">暂无数据</div>';
+            }
+        }
+        
+        // ========================================================================
+        // 事件绑定
+        // ========================================================================
+        
+        function bindEvents() {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+                });
+            });
+            
+            document.getElementById('curve1Degree').addEventListener('change', updateCurvesFromInput);
+            document.getElementById('curve1KnotType').addEventListener('change', updateCurvesFromInput);
+            document.getElementById('curve2Degree').addEventListener('change', updateCurvesFromInput);
+            document.getElementById('curve2KnotType').addEventListener('change', updateCurvesFromInput);
+            
+            document.getElementById('curve1ControlPointsList').addEventListener('input', (e) => {
+                if (e.target.dataset.index !== undefined) {
+                    updateControlPoint('curve1', e.target);
+                }
+            });
+            document.getElementById('curve1WeightsList').addEventListener('input', (e) => {
+                if (e.target.dataset.weightIndex !== undefined) {
+                    updateWeight('curve1', e.target);
+                }
+            });
+            document.getElementById('curve2ControlPointsList').addEventListener('input', (e) => {
+                if (e.target.dataset.index !== undefined) {
+                    updateControlPoint('curve2', e.target);
+                }
+            });
+            document.getElementById('curve2WeightsList').addEventListener('input', (e) => {
+                if (e.target.dataset.weightIndex !== undefined) {
+                    updateWeight('curve2', e.target);
+                }
+            });
+            
+            document.getElementById('curve1AddPoint').addEventListener('click', () => addControlPoint('curve1'));
+            document.getElementById('curve1RemovePoint').addEventListener('click', () => removeControlPoint('curve1'));
+            document.getElementById('curve2AddPoint').addEventListener('click', () => addControlPoint('curve2'));
+            document.getElementById('curve2RemovePoint').addEventListener('click', () => removeControlPoint('curve2'));
+            
+            document.getElementById('btnCompute').addEventListener('click', performComputation);
+            document.getElementById('btnFitView').addEventListener('click', () => canvasEngine.fitCurves(curve1, curve2));
+            document.getElementById('btnReset').addEventListener('click', resetApplication);
+            
+            document.getElementById('gridDensity').addEventListener('input', (e) => {
+                document.getElementById('gridDensityValue').textContent = `${e.target.value}×${e.target.value}`;
+            });
+            
+            document.querySelectorAll('.scenario-btn').forEach(btn => {
+                btn.addEventListener('click', () => loadScenario(btn.dataset.scenario));
+            });
+            
+            document.getElementById('btnBatchTest').addEventListener('click', runBatchTest);
+            document.getElementById('btnDownload').addEventListener('click', downloadData);
+        }
+        
+        function updateCurvesFromInput() {
+            // 重新创建曲线
+            const degree1 = parseInt(document.getElementById('curve1Degree').value);
+            const knotType1 = document.getElementById('curve1KnotType').value;
+            const oldPoints1 = curve1 ? curve1.controlPoints : [...defaultControlPoints1];
+            const oldWeights1 = curve1 ? curve1.weights : new Array(Math.max(6, oldPoints1.length)).fill(1.0);
+            
+            // 调整控制点数量以匹配新的阶数
+            const minPoints = degree1 + 1;
+            let newPoints1 = [...oldPoints1];
+            let newWeights1 = [...oldWeights1];
+            
+            while (newPoints1.length < minPoints) {
+                const lastPt = newPoints1[newPoints1.length - 1];
+                newPoints1.push({x: lastPt.x + 1, y: lastPt.y});
+                newWeights1.push(1.0);
+            }
+            
+            const knots1 = generateKnotVector(degree1, newPoints1.length, knotType1);
+            curve1 = createCurve(newPoints1.slice(0, newPoints1.length), newWeights1.slice(0, newPoints1.length), knots1, degree1);
+            updateControlPointsUI('curve1');
+            
+            const degree2 = parseInt(document.getElementById('curve2Degree').value);
+            const knotType2 = document.getElementById('curve2KnotType').value;
+            const oldPoints2 = curve2 ? curve2.controlPoints : [...defaultControlPoints2];
+            const oldWeights2 = curve2 ? curve2.weights : new Array(Math.max(6, oldPoints2.length)).fill(1.0);
+            
+            let newPoints2 = [...oldPoints2];
+            let newWeights2 = [...oldWeights2];
+            
+            while (newPoints2.length < minPoints) {
+                const lastPt = newPoints2[newPoints2.length - 1];
+                newPoints2.push({x: lastPt.x + 1, y: lastPt.y});
+                newWeights2.push(1.0);
+            }
+            
+            const knots2 = generateKnotVector(degree2, newPoints2.length, knotType2);
+            curve2 = createCurve(newPoints2.slice(0, newPoints2.length), newWeights2.slice(0, newPoints2.length), knots2, degree2);
+            updateControlPointsUI('curve2');
+            
+            updateCurves();
+            canvasEngine.fitCurves(curve1, curve2);
+        }
+        
+        function updateControlPoint(curvePrefix, inputEl) {
+            const curve = curvePrefix === 'curve1' ? curve1 : curve2;
+            const index = parseInt(inputEl.dataset.index);
+            const type = inputEl.dataset.type;
+            const value = parseFloat(inputEl.value);
+            
+            if (type === 'x') {
+                curve.controlPoints[index].x = value;
+            } else {
+                curve.controlPoints[index].y = value;
+            }
+            
+            updateCurves();
+        }
+        
+        function updateWeight(curvePrefix, inputEl) {
+            const curve = curvePrefix === 'curve1' ? curve1 : curve2;
+            const index = parseInt(inputEl.dataset.weightIndex);
+            const value = parseFloat(inputEl.value);
+            
+            curve.weights[index] = Math.max(0.001, value);
+            updateCurves();
+        }
+        
+        function addControlPoint(curvePrefix) {
+            const curve = curvePrefix === 'curve1' ? curve1 : curve2;
+            const lastPt = curve.controlPoints[curve.controlPoints.length - 1];
+            
+            curve.controlPoints.push({
+                x: lastPt.x + 1,
+                y: lastPt.y
+            });
+            curve.weights.push(1.0);
+            
+            // 重新生成 Knot 向量
+            const degree = curve.degree;
+            const knotType = document.getElementById(`${curvePrefix}KnotType`).value;
+            curve.knots = generateKnotVector(degree, curve.controlPoints.length, knotType);
+            
+            updateControlPointsUI(curvePrefix);
+            updateCurves();
+        }
+        
+        function removeControlPoint(curvePrefix) {
+            const curve = curvePrefix === 'curve1' ? curve1 : curve2;
+            
+            if (curve.controlPoints.length <= curve.degree + 1) {
+                alert('控制点数量不能少于阶数 +1');
+                return;
+            }
+            
+            curve.controlPoints.pop();
+            curve.weights.pop();
+            
+            const degree = curve.degree;
+            const knotType = document.getElementById(`${curvePrefix}KnotType`).value;
+            curve.knots = generateKnotVector(degree, curve.controlPoints.length, knotType);
+            
+            updateControlPointsUI(curvePrefix);
+            updateCurves();
+        }
+        
+        function resetApplication() {
+            initCurve1();
+            initCurve2();
+            currentResults = [];
+            
+            document.getElementById('geoStatus').className = 'status-badge status-undetermined';
+            document.getElementById('geoStatus').textContent = '未计算';
+            document.getElementById('geoMessage').textContent = '-';
+            document.getElementById('iterationLog').innerHTML = 
+                '<div class="form-label" style="text-align: center;">暂无数据</div>';
+            
+            updateCurves();
+            canvasEngine.fitCurves(curve1, curve2);
+        }
+        
+        // ========================================================================
+        // 场景加载
+        // ========================================================================
+        
+        const scenarios = {
+            intersect1: {
+                curve1: {
+                    degree: 3,
+                    controlPoints: [
+                        {x: -4, y: 0}, {x: -2, y: 3}, {x: 0, y: -2}, {x: 2, y: 3}, {x: 4, y: 0}
+                    ],
+                    weights: [1, 1, 1, 1, 1],
+                    knotType: 'clamped'
+                },
+                curve2: {
+                    degree: 3,
+                    controlPoints: [
+                        {x: -4, y: 2}, {x: -2, y: -2}, {x: 0, y: 2}, {x: 2, y: -2}, {x: 4, y: 2}
+                    ],
+                    weights: [1, 1, 1, 1, 1],
+                    knotType: 'clamped'
+                }
+            },
+            tangent1: {
+                curve1: {
+                    degree: 2,
+                    controlPoints: [
+                        {x: -3, y: 0}, {x: 0, y: 3}, {x: 3, y: 0}
+                    ],
+                    weights: [1, 1, 1],
+                    knotType: 'clamped'
+                },
+                curve2: {
+                    degree: 2,
+                    controlPoints: [
+                        {x: -3, y: 0}, {x: 0, y: -3}, {x: 3, y: 0}
+                    ],
+                    weights: [1, 1, 1],
+                    knotType: 'clamped'
+                }
+            },
+            separated1: {
+                curve1: {
+                    degree: 3,
+                    controlPoints: [
+                        {x: -4, y: 2}, {x: -2, y: 4}, {x: 0, y: 2}, {x: 2, y: 4}, {x: 4, y: 2}
+                    ],
+                    weights: [1, 1, 1, 1, 1],
+                    knotType: 'clamped'
+                },
+                curve2: {
+                    degree: 3,
+                    controlPoints: [
+                        {x: -4, y: -2}, {x: -2, y: -4}, {x: 0, y: -2}, {x: 2, y: -4}, {x: 4, y: -2}
+                    ],
+                    weights: [1, 1, 1, 1, 1],
+                    knotType: 'clamped'
+                }
+            },
+            circle: {
+                curve1: {
+                    degree: 2,
+                    controlPoints: [
+                        {x: 1, y: 0}, {x: 1, y: 1}, {x: 0, y: 1},
+                        {x: -1, y: 1}, {x: -1, y: 0}, {x: -1, y: -1},
+                        {x: 0, y: -1}, {x: 1, y: -1}, {x: 1, y: 0}
+                    ],
+                    weights: [1, 0.7071, 1, 0.7071, 1, 0.7071, 1, 0.7071, 1],
+                    knotType: 'clamped'
+                },
+                curve2: {
+                    degree: 3,
+                    controlPoints: [
+                        {x: -2, y: -2}, {x: 0, y: 2}, {x: 2, y: -2}
+                    ],
+                    weights: [1, 1, 1],
+                    knotType: 'clamped'
+                }
+            }
+        };
+        
+        function loadScenario(scenarioName) {
+            const scenario = scenarios[scenarioName];
+            if (!scenario) {
+                alert('场景不存在');
+                return;
+            }
+            
+            // 加载曲线 1
+            const knots1 = generateKnotVector(
+                scenario.curve1.degree,
+                scenario.curve1.controlPoints.length,
+                scenario.curve1.knotType
+            );
+            curve1 = createCurve(
+                scenario.curve1.controlPoints,
+                scenario.curve1.weights,
+                knots1,
+                scenario.curve1.degree
+            );
+            
+            // 加载曲线 2
+            const knots2 = generateKnotVector(
+                scenario.curve2.degree,
+                scenario.curve2.controlPoints.length,
+                scenario.curve2.knotType
+            );
+            curve2 = createCurve(
+                scenario.curve2.controlPoints,
+                scenario.curve2.weights,
+                knots2,
+                scenario.curve2.degree
+            );
+            
+            // 更新 UI
+            document.getElementById('curve1Degree').value = scenario.curve1.degree;
+            document.getElementById('curve1KnotType').value = scenario.curve1.knotType;
+            document.getElementById('curve2Degree').value = scenario.curve2.degree;
+            document.getElementById('curve2KnotType').value = scenario.curve2.knotType;
+            
+            updateControlPointsUI('curve1');
+            updateControlPointsUI('curve2');
+            
+            // 重置结果
+            currentResults = [];
+            document.getElementById('geoStatus').className = 'status-badge status-undetermined';
+            document.getElementById('geoStatus').textContent = '未计算';
+            
+            updateCurves();
+            canvasEngine.fitCurves(curve1, curve2);
+            
+            // 高亮选中按钮
+            document.querySelectorAll('.scenario-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.scenario === scenarioName);
+            });
+        }
+        
+        // ========================================================================
+        // 批量测试
+        // ========================================================================
+        
+        function runBatchTest() {
+            const btn = document.getElementById('btnBatchTest');
+            const resultEl = document.getElementById('batchTestResult');
+            
+            btn.disabled = true;
+            btn.textContent = '测试中...';
+            resultEl.textContent = '';
+            
+            setTimeout(() => {
+                let successCount = 0;
+                let totalTests = 100;
+                let avgIterations = 0;
+                
+                for (let i = 0; i < totalTests; i++) {
+                    // 生成随机曲线
+                    const randomCurve1 = generateRandomCurve();
+                    const randomCurve2 = generateRandomCurve();
+                    
+                    try {
+                        const results = unifiedSolve(randomCurve1, randomCurve2, {
+                            gridSize: 5,
+                            maxIterations: 50
+                        });
+                        
+                        if (results.length > 0 && results[0].converged) {
+                            successCount++;
+                            avgIterations += results[0].iterations;
+                        }
+                    } catch (e) {
+                        // 捕获异常
+                    }
+                }
+                
+                avgIterations /= Math.max(1, successCount);
+                
+                resultEl.innerHTML = `
+                    <span style="color: var(--accent-cyan);">成功率：</span>${(successCount/totalTests*100).toFixed(1)}%<br>
+                    <span style="color: var(--accent-cyan);">平均迭代：</span>${avgIterations.toFixed(1)}次
+                `;
+                
+                btn.disabled = false;
+                btn.textContent = '运行压力测试';
+            }, 100);
+        }
+        
+        function generateRandomCurve() {
+            const degree = 3;
+            const numPoints = 6;
+            const controlPoints = [];
+            const weights = [];
+            
+            for (let i = 0; i < numPoints; i++) {
+                controlPoints.push({
+                    x: (Math.random() - 0.5) * 10,
+                    y: (Math.random() - 0.5) * 10
+                });
+                weights.push(0.5 + Math.random());
+            }
+            
+            const knots = generateKnotVector(degree, numPoints, 'clamped');
+            return createCurve(controlPoints, weights, knots, degree);
+        }
+        
+        function downloadData() {
+            try {
+                const exportData = {
+                    timestamp: new Date().toISOString(),
+                    curve1: {
+                        degree: curve1.degree,
+                        controlPoints: curve1.controlPoints,
+                        weights: curve1.weights,
+                        knots: curve1.knots,
+                        knotType: document.getElementById('curve1KnotType').value
+                    },
+                    curve2: {
+                        degree: curve2.degree,
+                        controlPoints: curve2.controlPoints,
+                        weights: curve2.weights,
+                        knots: curve2.knots,
+                        knotType: document.getElementById('curve2KnotType').value
+                    },
+                    results: currentResults.length > 0 ? {
+                        state: currentResults[0].state,
+                        message: currentResults[0].message,
+                        u: currentResults[0].u,
+                        v: currentResults[0].v,
+                        distance: currentResults[0].distance,
+                        residual: currentResults[0].residual,
+                        iterations: currentResults[0].iterations,
+                        converged: currentResults[0].converged,
+                        point1: currentResults[0].point1,
+                        point2: currentResults[0].point2,
+                        iterationHistory: currentResults[0].iterationHistory || []
+                    } : null,
+                    solverConfig: {
+                        gridSize: parseInt(document.getElementById('gridDensity').value),
+                        maxIterations: parseInt(document.getElementById('maxIterations').value),
+                        tolerance: parseFloat(document.getElementById('convergenceTolerance').value),
+                        usePreFiltering: document.getElementById('usePreFiltering').checked
+                    }
+                };
+                
+                const jsonString = JSON.stringify(exportData, null, 2);
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                
+                // 兼容 file:// 协议的下载方案
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `nurbs_config_${new Date().getTime()}.json`;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                // 延迟释放 URL
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+                
+                showToast('✅ 数据导出成功');
+                console.log('[DOWNLOAD] ✅ 数据导出成功');
+            } catch (error) {
+                console.error('[DOWNLOAD] 导出失败:', error);
+                alert(`数据导出失败：${error.message}\n\n提示：如果您使用的是 file://协议，某些浏览器可能限制下载功能。建议使用 Chrome 或 Firefox。`);
+            }
+        }
+        
+        function showToast(message, duration = 3000) {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0, 217, 255, 0.9);
+                color: #000;
+                padding: 12px 24px;
+                border-radius: 6px;
+                font-size: 14px;
+                font-weight: 600;
+                z-index: 10000;
+                box-shadow: 0 4px 12px rgba(0, 217, 255, 0.4);
+                animation: slideUp 0.3s ease-out;
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+        
+        // ========================================================================
+        // 启动应用
+        // ========================================================================
+        
+        // 等待 DOM 完全加载
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('[STARTUP] DOM 加载完成，启动应用');
+                init().catch(e => console.error('[INIT] 初始化失败:', e));
+            });
+        } else {
+            console.log('[STARTUP] DOM 已就绪，立即启动应用');
+            init().catch(e => console.error('[INIT] 初始化失败:', e));
+        }
+    </script>
+</body>
+</html>

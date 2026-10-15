@@ -1,0 +1,120 @@
+{
+  "meta": {
+    "seed": 20261012,
+    "generatedAt": "2026-10-12T18:19:17.621Z",
+    "note": "每阈值扫描共用同一批固定用例，隔离随机性"
+  },
+  "angular": [
+    {
+      "angleDeg": 6,
+      "tangentAcc": 100,
+      "tangentLabelRate": 40.75,
+      "shallowAcc": 100,
+      "n": 400
+    },
+    {
+      "angleDeg": 8,
+      "tangentAcc": 100,
+      "tangentLabelRate": 48,
+      "shallowAcc": 100,
+      "n": 400
+    },
+    {
+      "angleDeg": 10,
+      "tangentAcc": 100,
+      "tangentLabelRate": 57.25,
+      "shallowAcc": 100,
+      "n": 400
+    },
+    {
+      "angleDeg": 12,
+      "tangentAcc": 100,
+      "tangentLabelRate": 62.5,
+      "shallowAcc": 100,
+      "n": 400
+    },
+    {
+      "angleDeg": 14,
+      "tangentAcc": 100,
+      "tangentLabelRate": 68.75,
+      "shallowAcc": 100,
+      "n": 400
+    },
+    {
+      "angleDeg": 16,
+      "tangentAcc": 100,
+      "tangentLabelRate": 75,
+      "shallowAcc": 100,
+      "n": 400
+    },
+    {
+      "angleDeg": 20,
+      "tangentAcc": 100,
+      "tangentLabelRate": 80.75,
+      "shallowAcc": 100,
+      "n": 400
+    }
+  ],
+  "geometry": [
+    {
+      "tolerance": 0.000001,
+      "n": 3000,
+      "interAcc": 100,
+      "sepAcc": 100,
+      "nearAcc": 100,
+      "highAcc": 100
+    },
+    {
+      "tolerance": 1e-7,
+      "n": 3000,
+      "interAcc": 100,
+      "sepAcc": 100,
+      "nearAcc": 100,
+      "highAcc": 100
+    },
+    {
+      "tolerance": 1e-8,
+      "n": 3000,
+      "interAcc": 100,
+      "sepAcc": 100,
+      "nearAcc": 100,
+      "highAcc": 100
+    },
+    {
+      "tolerance": 1e-9,
+      "n": 3000,
+      "interAcc": 100,
+      "sepAcc": 100,
+      "nearAcc": 100,
+      "highAcc": 100
+    },
+    {
+      "tolerance": 1e-10,
+      "n": 3000,
+      "interAcc": 100,
+      "sepAcc": 100,
+      "nearAcc": 100,
+      "highAcc": 100
+    }
+  ],
+  "boundary": [
+    {
+      "boundaryTol": 0.00001,
+      "n": 400,
+      "highAcc": 100,
+      "tangentAcc": 100
+    },
+    {
+      "boundaryTol": 0.0001,
+      "n": 400,
+      "highAcc": 100,
+      "tangentAcc": 100
+    },
+    {
+      "boundaryTol": 0.001,
+      "n": 400,
+      "highAcc": 100,
+      "tangentAcc": 100
+    }
+  ]
+}

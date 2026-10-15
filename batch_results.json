@@ -1,0 +1,299 @@
+{
+  "meta": {
+    "seed": 20261012,
+    "generatedAt": "2026-10-12T18:13:33.381Z",
+    "runtimeMs": 7768,
+    "nIntersect": 2000,
+    "nTangent": 400,
+    "nHighOrder": 400,
+    "nSeparated": 1000,
+    "nNear": 400,
+    "total": 4200,
+    "solver": "unifiedSolve (prefilter+grid6+LM80)",
+    "note": "相交/相切/高阶经共享端点构造保证真实接触；分离经包围盒分离平移；近接触经微小平移"
+  },
+  "summaries": {
+    "intersect": {
+      "group": "INTERSECT",
+      "cases": 2000,
+      "correct": 2000,
+      "wrong": 0,
+      "exceptions": 0,
+      "accuracy": 100,
+      "geoCorrect": 2000,
+      "geoWrong": 0,
+      "geoAccuracy": 100,
+      "stateCounts": {
+        "INTERSECTION": 1999,
+        "TANGENT": 1
+      },
+      "distMin": 0,
+      "distP50": 0,
+      "distMax": 9.550319010530261e-9,
+      "avgIterations": 2.6255,
+      "geoErrorSamples": []
+    },
+    "tangent": {
+      "group": "TANGENT",
+      "cases": 400,
+      "correct": 400,
+      "wrong": 0,
+      "exceptions": 0,
+      "accuracy": 100,
+      "geoCorrect": 400,
+      "geoWrong": 0,
+      "geoAccuracy": 100,
+      "stateCounts": {
+        "TANGENT": 250,
+        "INTERSECTION": 150
+      },
+      "distMin": 0,
+      "distP50": 0,
+      "distMax": 9.948918734507623e-9,
+      "avgIterations": 4.1525,
+      "geoErrorSamples": [],
+      "subMetric": "TANGENT",
+      "subRate": 62.5
+    },
+    "highOrder": {
+      "group": "HIGH_ORDER",
+      "cases": 400,
+      "correct": 400,
+      "wrong": 0,
+      "exceptions": 0,
+      "accuracy": 100,
+      "geoCorrect": 400,
+      "geoWrong": 0,
+      "geoAccuracy": 100,
+      "stateCounts": {
+        "INTERSECTION": 400
+      },
+      "distMin": 0,
+      "distP50": 0,
+      "distMax": 6.946053812044522e-9,
+      "avgIterations": 2.305,
+      "geoErrorSamples": []
+    },
+    "separated": {
+      "group": "SEPARATED",
+      "cases": 1000,
+      "correct": 1000,
+      "wrong": 0,
+      "exceptions": 0,
+      "accuracy": 100,
+      "geoCorrect": 1000,
+      "geoWrong": 0,
+      "geoAccuracy": 100,
+      "stateCounts": {
+        "SEPARATED": 1000
+      },
+      "distMin": 0.5727453353048187,
+      "distP50": 4.390262350336874,
+      "distMax": 8.981687841633113,
+      "avgIterations": 31.959,
+      "geoErrorSamples": []
+    },
+    "near": {
+      "group": "NEAR",
+      "cases": 400,
+      "correct": 400,
+      "wrong": 0,
+      "exceptions": 0,
+      "accuracy": 100,
+      "geoCorrect": 400,
+      "geoWrong": 0,
+      "geoAccuracy": 100,
+      "stateCounts": {
+        "SEPARATED": 400
+      },
+      "distMin": 0.01025380845435925,
+      "distP50": 0.029495842746525492,
+      "distMax": 0.05753478579376218,
+      "avgIterations": 36.7725,
+      "geoErrorSamples": []
+    }
+  },
+  "sampleResults": [
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 5.551115123125783e-17,
+      "iterations": 1,
+      "nResults": 3,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 5,
+      "nResults": 4,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 1,
+      "nResults": 6,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 2,
+      "nResults": 4,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 1.1102230246251565e-16,
+      "iterations": 1,
+      "nResults": 7,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 3,
+      "nResults": 4,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 1,
+      "nResults": 4,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 3,
+      "nResults": 5,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 5.551115123125783e-17,
+      "iterations": 1,
+      "nResults": 4,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 1,
+      "nResults": 3,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 1,
+      "nResults": 6,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 1,
+      "nResults": 6,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 2,
+      "nResults": 3,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 2.1967585482512801e-13,
+      "iterations": 7,
+      "nResults": 3,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 1,
+      "nResults": 5,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 1.1102230246251565e-16,
+      "iterations": 3,
+      "nResults": 2,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 1,
+      "nResults": 2,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 2,
+      "nResults": 4,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 1,
+      "nResults": 4,
+      "error": null
+    },
+    {
+      "group": "INTERSECT",
+      "groundTruth": "INTERSECTION",
+      "predicted": "INTERSECTION",
+      "distance": 0,
+      "iterations": 1,
+      "nResults": 3,
+      "error": null
+    }
+  ],
+  "allCounts": 4200
+}
