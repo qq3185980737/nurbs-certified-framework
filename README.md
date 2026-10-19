@@ -44,6 +44,7 @@ The demo exposes the certified machinery directly, matching the manuscript's cla
 - **Condition number κ** — the root Jacobian condition number is shown; tangency / singularity reports `+∞` (the paper's κ > 10⁴ transverse-vs-tangent classifier).
 - **Certified proof summary** — a Krawczyk interval enumeration reports how many transverse roots are *proved* (`proven_count`), how many are suspected tangent / degenerate (`tangent_count`), how many boxes were evaluated, and whether the full parameter domain was covered (`complete`). Exposed in the C API as `nurbs_enumerate_intersections` and in the WASM frontend as `enumerateIntersections`.
 - Eight preset scenarios (transverse, multiple, tangent, higher-order tangent, near/far separated, endpoint, circle-vs-curve) exercise all of these outputs.
+- **Built-in stress test** — the "运行压力测试" button runs 100 random curve pairs with a **fixed seed** (fully reproducible) and reports success rate, average iterations, condition-number finite/singular counts, and a Krawczyk proof summary (proved / suspected-tangent / full-domain coverage) over a sampled subset.
 
 C++ benchmark / test binaries live under `cpp/build` (MSVC `Release /O2 /fp:precise`):
 
@@ -70,6 +71,7 @@ experiment_*.md / *.json   Detailed experimental results
 
 - Build & run instructions: `README_LOCAL_RUN.txt`, `cpp/CMakeLists.txt`, `build.mjs`.
 - Regression / ablation scripts: `*.mjs`, `*.py` at repository root.
+- Frontend pressure regression: serve `stress_test.html` over HTTP (60 curated combos + 300 random pairs; captures any alert/exception and reports κ/proof stats).
 - Ground-truth verification: `_ground_truth.py` (e.g. lemniscate self-intersection coordinates to ~1e-16, `min‖∂S/∂s×∂S/∂v‖ = √2·π` independently verified).
 
 ## License
