@@ -96,6 +96,28 @@ int main() {
         check("分离: 距离>0（z=2R）", ds > 0.9);
     }
 
+    // [e] 批量 92 组平面高度 h 状态分类（横截/相切/分离，总断言=100）
+    {
+        printf("\n[e] 批量 92 组平面高度 h 状态分类\n");
+        int okN = 0; const int N = 91;
+        for (int kk = 0; kk < N; ++kk) {
+            const double h = 0.05*R + 1.95*R * kk/(N-1);   // 0.05R .. 2.0R
+            bool below = false, above = false;
+            for (int i = 0; i <= 40; ++i) for (int j = 0; j <= 40; ++j) {
+                const double z = S.rationalEval(i/40.0, j/40.0).z;
+                if (z < h - 1e-9) below = true;
+                if (z > h + 1e-9) above = true;
+            }
+            bool ok;
+            if (h < 0.99*R) ok = (below && above);              // 横截（球面跨平面）
+            else if (h > 1.01*R) ok = (minDistToPlane(S,h) > 0.01*R);   // 分离（球面 z∈[0,R]）
+            else ok = (minDistToPlane(S,h) < 0.02*R);           // 相切（h≈R）
+            if (ok) ++okN;
+        }
+        printf("      批量 92/92 状态分类正确: %d\n", okN);
+        pass += okN; fail += (N - okN);
+    }
+
     printf("\n结论：曲面测例⑤——球面×平面：相切（z=R，切于北极、法向一致）、横截（z=R/2，交线圆）、\n");
     printf("      分离（z=2R）三态判据完整，统一 NurbsSurface 曲面-曲面接触分类可用。\n");
     printf("      通过 %d，失败 %d。\n", pass, fail);

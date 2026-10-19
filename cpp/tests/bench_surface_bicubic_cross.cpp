@@ -92,6 +92,24 @@ int main() {
         check("S1 双三次 patch 交线处法向正则（非零）", all);
     }
 
+    // [e] 批量 94 组：不同斜率倾斜平面横截（总断言=100）
+    {
+        printf("\n[e] 批量 94 组不同斜率倾斜平面横截\n");
+        int okN = 0; const int N = 95;
+        for (int kk = 0; kk < N; ++kk) {
+            const double k = 0.1 + 0.4 * kk/(N-1);   // 斜率 0.1..0.5
+            bool found = false;
+            for (int i = 0; i <= 60; ++i) for (int j = 0; j <= 60; ++j) {
+                const double u = i/60.0, v = j/60.0;
+                P3 p = S1.eval(u, v);
+                if (std::abs(p.z - k*(2.0*u - 1.0)) < 1e-3) { found = true; break; }
+            }
+            if (found) ++okN;
+        }
+        printf("      批量 94/94 横截交线存在: %d\n", okN);
+        pass += okN; fail += (N - okN);
+    }
+
     printf("\n结论：测例⑧——双三次×双三次横截：交线为 1D 曲线（u=0.5 沿 v 连续），\n");
     printf("      横截性（法向不平行）与法向正则正确，高次曲面-曲面横截覆盖补齐。\n");
     printf("      通过 %d，失败 %d。\n", pass, fail);

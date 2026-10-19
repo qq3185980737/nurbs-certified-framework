@@ -98,6 +98,27 @@ int main() {
         check("退化线 z=0.8 在碗上方（分离，无交点）", hit == 0);
     }
 
+    // [e] 批量 95 组退化点位置（接触顶点/分离，总断言=100）
+    {
+        printf("\n[e] 批量 95 组退化点位置（顶点接触 vs 碗外分离）\n");
+        int okN = 0; const int N = 95;
+        for (int kk = 0; kk < N; ++kk) {
+            const double z0 = 0.2 + 0.7*kk/(N-1);   // 0.2 .. 0.9
+            P3 pc[4] = { {0.5,0.5,z0}, {0.5,0.5,z0}, {0.5,0.5,z0}, {0.5,0.5,z0} };
+            nurbs::NurbsSurface D = nurbs::NurbsSurface::makeBilinear(pc);
+            P3 p = D.eval(0.5, 0.5);
+            double mn = 1e300;   // 点 p 到碗的最近距离（粗网格，含顶点 (0.5,0.5)）
+            for (int a2 = 0; a2 <= 40; ++a2) for (int b2 = 0; b2 <= 40; ++b2)
+                mn = std::min(mn, dist(p, S.eval(a2/40.0, b2/40.0)));
+            bool ok;
+            if (std::abs(z0 - 0.375) < 0.02) ok = (mn < 0.03);   // 碗顶点 z=0.375 邻域 → 接触
+            else ok = (mn > 0.02);                                 // 其余 → 分离
+            if (ok) ++okN;
+        }
+        printf("      批量 95/95 退化点接触/分离: %d\n", okN);
+        pass += okN; fail += (N - okN);
+    }
+
     printf("\n结论：测例⑪——退化曲面×正常曲面：退化点 patch 在碗上接触/碗外分离，退化线 patch 穿碗\n");
     printf("      交两点/碗外分离，退化×正常组合覆盖补齐。\n");
     printf("      通过 %d，失败 %d。\n", pass, fail);

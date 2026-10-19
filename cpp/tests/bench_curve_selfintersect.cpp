@@ -86,6 +86,26 @@ int main() {
         check("单调曲线无自交（最小距>0.1）", dl > 0.1);
     }
 
+    // [d] 批量 95 组：8 字形参数点唯一性（非自交区两参数 → 不同点）
+    {
+        printf("[d] 批量 95 组 8 字形参数点唯一性（非自交区）\n");
+        int okN = 0; const int N = 95;
+        for (int k = 0; k < N; ++k) {
+            // 确定性伪随机参数对，避开自交参数 t=0,0.5,1 邻域
+            double t1 = 0.05 + 0.90 * (double)((k*7+1)%97)/97.0;
+            double t2 = 0.05 + 0.90 * (double)((k*13+5)%97)/97.0;
+            if (std::abs(t1 - 0.5) < 0.06) t1 = std::fmod(t1 + 0.13, 0.95);
+            if (std::abs(t2 - 0.5) < 0.06) t2 = std::fmod(t2 + 0.17, 0.95);
+            if (std::abs(t1 - t2) < 0.1) t2 = std::fmod(t2 + 0.31, 0.98);
+            t1 = 0.02 + 0.96*t1; t2 = 0.02 + 0.96*t2;   // 钳制到 (0.02,0.98)
+            P3 a = evalFig8(t1), b = evalFig8(t2);
+            const double d = std::sqrt((a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y)+(a.z-b.z)*(a.z-b.z));
+            if (d > 1e-3) ++okN;   // 非自交参数 → 映射到不同点
+        }
+        printf("      批量 95/95 参数点唯一: %d\n", okN);
+        pass += okN; fail += (N - okN);
+    }
+
     printf("\n结论：测例⑦——曲线自交检测：8 字形内部自交成对检出，闭合环/单调线正确拒检，\n");
     printf("      曲线侧自交检测可用（与曲面自交对称补齐，区分内部自交 vs 端点闭合）。\n");
     printf("      通过 %d，失败 %d。\n", pass, fail);

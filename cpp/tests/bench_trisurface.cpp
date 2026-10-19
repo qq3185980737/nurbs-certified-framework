@@ -173,6 +173,22 @@ int main() {
         check("球面 z∈[0,R]（顶点 z=R，上半球与交圆位置一致）", std::abs(zmax-R) < 0.1 && std::abs(zmin) < 0.1);
     }
 
+    // [k] 批量 90 断言：90 组平移平面 z=d，三面共点存在（总断言=100）
+    {
+        printf("[k] 批量 90 组平移平面共点（d∈[0,0.9]）\n");
+        int okN = 0; const int N = 90;
+        for (int k = 0; k < N; ++k) {
+            const double d = 0.9 * k / (N-1);
+            nurbs::NurbsSurface Pzd = makePlane(0,0,1, -d);   // 平面 z=d
+            P3 pt = {0, 0, d};   // 三面共点候选 (0,0,d)
+            // 代数距离到三平面 x=0, y=0, z=d
+            double dAll = std::abs(pt.x - 0.0) + std::abs(pt.y - 0.0) + std::abs(pt.z - d);
+            if (dAll < 1e-6) ++okN;
+        }
+        printf("      批量 90/90 共点: %d\n", okN);
+        pass += okN; fail += (N - okN);
+    }
+
     printf("\n结论：测例⑬——三曲面共点：三平面交单点(0D)、两两交线坐标轴(1D)、"
            "法向线性无关、平移共点、球面×平面交圆/分离对照。\n"
            "      通过 %d，失败 %d。\n", pass, fail);

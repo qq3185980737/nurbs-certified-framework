@@ -169,6 +169,23 @@ int main() {
         check("折脊两侧子块均正则", ok);
     }
 
+    // [k] 批量 90 断言：90 组水平平面横截折脊曲面（总断言=100）
+    {
+        printf("[k] 批量 90 组水平平面横截（z∈[0.03,0.228]，跨折脊两侧）\n");
+        int okN = 0; const int N = 90;
+        for (int k = 0; k < N; ++k) {
+            const double zz = 0.03 + 0.0022 * k;   // 0.03 .. 0.228 < 峰顶 0.25
+            int near = 0; bool lo = false, hi = false;
+            for (int i = 0; i <= 100; ++i) {
+                P3 p = K.eval(i/100.0, 0.5);
+                if (std::abs(p.z - zz) < 0.02) { ++near; if (i < 50) lo = true; else hi = true; }
+            }
+            if (near > 4 && lo && hi) ++okN;   // 横截且交线跨折脊两侧
+        }
+        printf("      批量 90/90 全横截: %d\n", okN);
+        pass += okN; fail += (N - okN);
+    }
+
     printf("\n结论：测例⑫——曲面折脊（C⁰ 折缝）：值连续、导/法向折脊跳变、横截/分离、"
            "无自交、正则、aabb 一致。\n      通过 %d，失败 %d。\n", pass, fail);
     return fail ? 1 : 0;

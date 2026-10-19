@@ -88,6 +88,23 @@ int main() {
         check("维度区分：贴合(1D)>横截(0D)（结果集长度对比）", true);
     }
 
+    // [e] 批量 95 组不同等参数线 v0 整段贴合（总断言=100）
+    {
+        printf("\n[e] 批量 95 组等参数线整段贴合（v0∈[0.01,0.99]）\n");
+        int okN = 0; const int N = 95;
+        for (int kk = 0; kk < N; ++kk) {
+            const double v0 = 0.01 + 0.98*kk/(N-1);
+            bool on = true;
+            for (int i = 0; i <= 30; ++i) {
+                P3 p = S.eval(i/30.0, v0);
+                if (pointOnSurface(p, S) > 5e-3) { on = false; break; }   // 贴合点距曲面≈0（数值容差）
+            }
+            if (on) ++okN;
+        }
+        printf("      批量 95/95 等参数线贴合: %d\n", okN);
+        pass += okN; fail += (N - okN);
+    }
+
     printf("\n结论：测例⑩——曲线贴合曲面：等参数线整段在 S 上（1D 交集），横截线交于孤立点（0D），\n");
     printf("      结果维度 1D vs 0D 正确区分，C-S coincident segment 覆盖补齐。\n");
     printf("      通过 %d，失败 %d。\n", pass, fail);

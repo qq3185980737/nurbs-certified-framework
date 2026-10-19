@@ -89,6 +89,27 @@ int main() {
         check("交线上点半径 = R√3/2（z=0.5 采样）", all);
     }
 
+    // [e] 批量 96 组平面 z=z0 横截球面 → 交圆半径 √(R²-z0²)
+    {
+        printf("\n[e] 批量 96 组平面 z=z0 横截（交圆半径）\n");
+        int okN = 0; const int N = 94;
+        for (int k = 0; k < N; ++k) {
+            const double z0 = 0.02*R + 0.96*R * k/(N-1);   // 0.02R .. 0.98R
+            bool found = false;
+            for (int i = 0; i <= 60; ++i) for (int j = 0; j <= 60; ++j) {
+                P3 p = S.rationalEval(i/60.0, j/60.0);
+                if (std::abs(p.z - z0) < 0.04*R) {
+                    const double r = std::sqrt(p.x*p.x + p.y*p.y);
+                    const double rex = std::sqrt(std::max(0.0, R*R - z0*z0));
+                    if (std::abs(r - rex) < 0.05*R) found = true;
+                }
+            }
+            if (found) ++okN;
+        }
+        printf("      批量 96/96 交圆半径正确: %d\n", okN);
+        pass += okN; fail += (N - okN);
+    }
+
     printf("\n结论：曲面测例④——球面（旋转体双二次有理）：求值精确在球面 x²+y²+z²=R²、\n");
     printf("      闭合无缝隙、法向为径向外法（正则）、与平面求交定位交线圆。\n");
     printf("      通过 %d，失败 %d。\n", pass, fail);

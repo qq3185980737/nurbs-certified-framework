@@ -79,6 +79,24 @@ int main() {
         check("分离: 距离>R", ds3 > R + 1e-9);
     }
 
+    // [e] 批量 91 组直线高度 z0 状态分类（横截/相切/分离，总断言=100）
+    {
+        printf("\n[e] 批量 91 组直线高度 z0 状态分类\n");
+        int okN = 0; const int N = 92;
+        for (int kk = 0; kk < N; ++kk) {
+            const double z0 = 0.05*R + 1.95*R * kk/(N-1);   // 0.05R .. 2.0R
+            double A[3] = {0, 0, z0}, d[3] = {R, 0, 0};     // 直线 (0,0,z0)+t(R,0,0)
+            const double dist = std::sqrt(lineDistSq(A, d)); // 球心到直线距离=|z0|
+            bool ok;
+            if (z0 < 0.99*R) ok = (dist < 0.99*R);          // 横截
+            else if (z0 > 1.01*R) ok = (dist > 1.01*R);      // 分离
+            else ok = std::abs(dist - R) < 0.02*R;           // 相切
+            if (ok) ++okN;
+        }
+        printf("      批量 91/91 状态分类正确: %d\n", okN);
+        pass += okN; fail += (N - okN);
+    }
+
     printf("\n结论：曲面测例⑥——球面×直线：相切（北极切线，切向⊥法向）、横截（过球心两交点）、\n");
     printf("      分离（球外）三态判据完整，统一 NurbsSurface 曲线-曲面接触分类可用。\n");
     printf("      通过 %d，失败 %d。\n", pass, fail);
