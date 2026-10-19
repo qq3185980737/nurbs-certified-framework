@@ -26,6 +26,8 @@ Run each with the `occ` conda env's python (`/root/miniconda3/envs/occ/bin/pytho
 | `compare_ssi.py` | Surface-surface (graph patches): fixtures A `s^2-t^2=0`, B `f=0.3`, C `f=s+0.5t`, via `GeomAPI_IntSS`. |
 | `compare_ssi2.py` | Surface-surface: degenerate tangency `f=(s-t)^2` (true intersection = whole diagonal s=t), via `GeomAPI_IntSS`. |
 | `compare_ssi_detail.py` | Samples OCCT's single intersection line on fixture A to confirm which diagonal it returns. |
+| `compare_self.py` | Surface self-intersection: folded patch `(u^2-v^2,2uv,u^2+v^2)` via `GeomAPI_IntSS(S,S)` and `BRepCheck_Analyzer`. |
+| `compare_nurbs.py` | Rational (NURBS) curves: rational Bezier quarter-circle and full circle vs straight lines, via `BRepAlgoAPI_Section`. |
 
 ## Observed results (tolerance 1e-9 unless noted)
 
