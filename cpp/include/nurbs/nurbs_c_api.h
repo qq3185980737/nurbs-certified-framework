@@ -43,6 +43,8 @@ typedef struct {
     double distance;
     int    iterations;
     int    converged;      /* 0/1 */
+    double residual;       /* 目标残差 f(u,v)=|P1(u)-P2(v)|² */
+    double condition;      /* 根处 Jacobian 条件数 κ（未收敛/奇异为 +inf） */
 } NurbsSolveResult;
 
 /* findAllIntersections 单根 */
@@ -51,6 +53,14 @@ typedef struct {
     double point1_x, point1_y, point2_x, point2_y;
     int    iterations;
 } NurbsRoot;
+
+/* 全局保证性枚举（区间细分 + Krawczyk 证明）汇总 */
+typedef struct {
+    int proven_count;     /* 已被 Krawczyk 证明存在唯一的横截解数 */
+    int tangent_count;    /* 疑似相切/退化（证明失败且近奇异）解数 */
+    int evaluated_boxes;  /* 区间细分评估的盒总数 */
+    int complete;         /* 全参数域已覆盖（1/0） */
+} NurbsEnumerationResult;
 
 /* ---- 错误码 ---- */
 enum {
@@ -87,6 +97,13 @@ void nurbs_solve_results_free(NurbsSolveResult* r);
 int nurbs_find_all_intersections(const NurbsCurve* a, const NurbsCurve* b,
                                  NurbsRoot** out_roots, int* out_n);
 void nurbs_roots_free(NurbsRoot* r);
+
+/* ---- 全局保证性枚举（区间细分 + Krawczyk 证明，带 proven 标记） ---- */
+/* 返回证明汇总：proven_count 为已被 Krawczyk 证明存在唯一的横截解数，
+   tangent_count 为疑似相切/退化解数，complete 指示全参数域是否被覆盖。
+   leafTol 为叶盒尺寸（默认 1e-4）。 */
+int nurbs_enumerate_intersections(const NurbsCurve* a, const NurbsCurve* b,
+                                  double leaf_tol, NurbsEnumerationResult* out);
 
 /* ---- BVH 加速求解（B1：空间索引复用，批量求交吞吐提升） ---- */
 /* 曲线索引：建一次、可对任意多次查询复用。索引不持有曲线数据（需与曲线一同存活）。 */

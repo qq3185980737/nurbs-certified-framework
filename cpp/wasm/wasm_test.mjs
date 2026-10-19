@@ -82,6 +82,20 @@ async function main() {
   if (bn >= 1) m._nurbs_solve_results_free(br);
   m._free(rPtr); m._free(nPtr2); m._free(iaPtr); m._free(ibPtr);
 
+  // enumerate_intersections：全局保证性枚举（区间细分 + Krawczyk 证明）汇总
+  const ePtr = m._malloc(16);
+  const erc = m._nurbs_enumerate_intersections(L1.handle, L2.handle, 1e-4, ePtr);
+  let enOk = false;
+  if (erc === 0) {
+    const pc = m.HEAPU32[ePtr >> 2], tc = m.HEAPU32[(ePtr + 4) >> 2];
+    const eb = m.HEAPU32[(ePtr + 8) >> 2], cpl = m.HEAPU32[(ePtr + 12) >> 2];
+    enOk = (pc + tc) >= 1 && cpl === 1;  // 检测到解（证明或疑似相切）+ 全域覆盖
+    console.log('enumerate_intersections rc=' + erc + ' proven=' + pc + ' tangent=' + tc + ' boxes=' + eb + ' complete=' + cpl);
+  } else {
+    console.log('enumerate_intersections rc=' + erc + ' (期望 0)');
+  }
+  m._free(ePtr);
+
   m._nurbs_curve_destroy(L1.handle);
   m._nurbs_curve_destroy(L2.handle);
 
@@ -112,7 +126,7 @@ async function main() {
     const n = m.HEAPU32[nPtr >> 2], res = m.HEAPU32[rPtr >> 2];
     let badPair = false;
     for (let i = 0; i < n; i++) {
-      const off = res + i * 72;
+      const off = res + i * 88;
       const st = m.HEAPU32[off >> 2], dist = m.HEAPF64[(off + 56) >> 3];
       if (st === 0 && !(dist < 1e-6)) badPair = true; // INTERSECTION 必须收敛
     }
@@ -129,8 +143,9 @@ async function main() {
   console.log('evaluate: ' + (evOk ? 'PASS' : 'FAIL'));
   console.log('unified_solve: ' + (solveOk ? 'PASS' : 'FAIL'));
   console.log('BVH solve: ' + (bvhOk ? 'PASS' : 'FAIL'));
+  console.log('enumerate: ' + (enOk ? 'PASS' : 'FAIL'));
   console.log('random batch: ' + (randOk ? 'PASS' : 'FAIL'));
-  const allOk = evOk && solveOk && bvhOk && randOk;
+  const allOk = evOk && solveOk && bvhOk && enOk && randOk;
   console.log('WASM 数值验证: ' + (allOk ? '全部通过' : '存在失败'));
   process.exit(allOk ? 0 : 1);
 }

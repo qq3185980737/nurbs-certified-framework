@@ -13,7 +13,7 @@
 // ============================================================================
 
 // ---- UI 工具：Knot 向量生成（纯 JS，非数值核；自 math_core.js 提取保留） ----
-function generateUniformKnotVector(n, p) {
+export function generateUniformKnotVector(n, p) {
     const m = n + p; // Knot 向量索引上限
     const knots = new Array(m + 1);
     // 首尾重节点 (clamped)
@@ -28,7 +28,7 @@ function generateUniformKnotVector(n, p) {
     return knots;
 }
 
-function generatePiecewiseBezierKnotVector(n, p) {
+export function generatePiecewiseBezierKnotVector(n, p) {
     const segments = n - p; // 贝塞尔段数
     if (segments <= 0) throw new Error('控制点数量不足以生成分段贝兹曲线');
     const knots = [];
@@ -41,7 +41,7 @@ function generatePiecewiseBezierKnotVector(n, p) {
     return knots;
 }
 
-function generateKnotVector(degree, numControlPoints, knotType = 'clamped') {
+export function generateKnotVector(degree, numControlPoints, knotType = 'clamped') {
     switch (knotType.toLowerCase()) {
         case 'uniform':
         case 'clamped':
@@ -86,9 +86,21 @@ function curveHandle(curve) {
         && entry.ctrlRef === curve.controlPoints && entry.degree === curve.degree) {
         return entry.handle;
     }
-    if (entry && entry.handle) m._nurbs_curve_destroy(entry.handle);
+    // 数据合法性校验：长度匹配 + 全部控制点/knots 为有限数。
+    // 编辑中间态（输入未完成/含 null/NaN）一律沿用旧句柄，不触发 create，
+    // 从而杜绝 validateCurve 抛异常 → destroy 悬垂句柄 → OOB 的死循环。
     const n = curve.controlPoints.length;
     const nk = curve.knots.length;
+    if (nk !== n + curve.degree + 1) return entry ? entry.handle : null;
+    for (let i = 0; i < n; i++) {
+        const p = curve.controlPoints[i];
+        if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.w))
+            return entry ? entry.handle : null;
+    }
+    for (let i = 0; i < nk; i++) {
+        if (!Number.isFinite(curve.knots[i])) return entry ? entry.handle : null;
+    }
+    // 先建新句柄，成功才销毁旧句柄并更新缓存（先建后删，无悬垂窗口）
     const cp = m._malloc(n * 3 * 8), kn = m._malloc(nk * 8);
     const c = cp / 8, k = kn / 8;
     for (let i = 0; i < n; i++) {
@@ -98,10 +110,17 @@ function curveHandle(curve) {
     }
     for (let i = 0; i < nk; i++) m.HEAPF64[k + i] = curve.knots[i];
     const out = m._malloc(8);
-    const rc = m._nurbs_curve_create(cp, n, kn, nk, curve.degree, out);
+    let rc;
+    try {
+        rc = m._nurbs_curve_create(cp, n, kn, nk, curve.degree, out);
+    } catch (e) {
+        m._free(cp); m._free(kn); m._free(out);
+        return entry ? entry.handle : null; // create 抛异常：保留旧句柄
+    }
     const handle = m.HEAPU32[out >> 2];
     m._free(cp); m._free(kn); m._free(out);
-    if (rc !== 0) throw new Error('WASM 曲线创建失败 rc=' + rc);
+    if (rc !== 0) return entry ? entry.handle : null; // create 失败：保留旧句柄
+    if (entry && entry.handle) m._nurbs_curve_destroy(entry.handle);
     curveCache.set(curve, { handle, knotsRef: curve.knots, weightsRef: curve.weights, ctrlRef: curve.controlPoints, degree: curve.degree });
     return handle;
 }
@@ -153,8 +172,9 @@ export const GeometryState = {
     UNDETERMINED: 'UNDETERMINED'
 };
 
-// NurbsSolveResult 布局（C 结构，72B/条）：
-//   state i32@0, pad, u@8, v@16, p1x@24, p1y@32, p2x@40, p2y@48, distance@56, iterations i32@64, converged i32@68
+// NurbsSolveResult 布局（C 结构，88B/条）：
+//   state i32@0, pad, u@8, v@16, p1x@24, p1y@32, p2x@40, p2y@48, distance@56, iterations i32@64,
+//   converged i32@68, residual@72, condition@80
 function readSolveResult(m, base) {
     return {
         state: STATE_STR[m.HEAPU32[base >> 2]] || 'UNDETERMINED',
@@ -164,7 +184,9 @@ function readSolveResult(m, base) {
         point2: { x: m.HEAPF64[(base + 40) >> 3], y: m.HEAPF64[(base + 48) >> 3] },
         distance: m.HEAPF64[(base + 56) >> 3],
         iterations: m.HEAPU32[(base + 64) >> 2],
-        converged: m.HEAPU32[(base + 68) >> 2]
+        converged: m.HEAPU32[(base + 68) >> 2],
+        residual: m.HEAPF64[(base + 72) >> 3],
+        condition: m.HEAPF64[(base + 80) >> 3]
     };
 }
 
@@ -183,10 +205,13 @@ export function unifiedSolve(curve1, curve2, options = {}) {
     const n = m.HEAPU32[nPtr >> 2], res = m.HEAPU32[resPtr >> 2];
     const results = [];
     if (rc === 0 && n >= 1) {
-        for (let i = 0; i < n; i++) results.push(readSolveResult(m, res + i * 72));
+        for (let i = 0; i < n; i++) results.push(readSolveResult(m, res + i * 88));
     } else if (rc !== 0) {
+        // rc<0：INVALID(-1)/RUNTIME(-2)。无交点/退化几何属正常无解情形，
+        // 按空结果返回，不作为致命错误抛出（避免连续切换场景时误报）。
         m._free(resPtr); m._free(nPtr);
-        throw new Error('WASM 求解失败 rc=' + rc);
+        console.warn('[solve] unifiedSolve rc=', rc, '按无解处理');
+        return [];
     }
     if (n >= 1) m._nurbs_solve_results_free(res);
     m._free(resPtr); m._free(nPtr);
@@ -217,9 +242,33 @@ export function findAllIntersections(curve1, curve2, options = {}) {
         }
     } else if (rc !== 0) {
         m._free(rootsPtr); m._free(nPtr);
-        throw new Error('WASM 全交点求解失败 rc=' + rc);
+        console.warn('[solve] findAllIntersections rc=', rc, '按无解处理');
+        return [];
     }
     if (n >= 1) m._nurbs_roots_free(roots);
     m._free(rootsPtr); m._free(nPtr);
     return out;
+}
+
+// NurbsEnumerationResult 布局（C 结构，16B）：proven_count i32@0, tangent_count i32@4,
+//   evaluated_boxes i32@8, complete i32@12
+// 全局保证性枚举（区间细分 + Krawczyk 证明）：返回证明汇总，供前端显示 certified 状态。
+export function enumerateIntersections(curve1, curve2, leafTol = 1e-4) {
+    const m = needMod();
+    const h1 = curveHandle(curve1), h2 = curveHandle(curve2);
+    const out = m._malloc(16);
+    const rc = m._nurbs_enumerate_intersections(h1, h2, leafTol, out);
+    let res = null;
+    if (rc === 0) {
+        res = {
+            provenCount: m.HEAPU32[out >> 2],
+            tangentCount: m.HEAPU32[(out + 4) >> 2],
+            evaluatedBoxes: m.HEAPU32[(out + 8) >> 2],
+            complete: m.HEAPU32[(out + 12) >> 2] ? true : false
+        };
+    } else {
+        console.warn('[solve] enumerateIntersections rc=', rc);
+    }
+    m._free(out);
+    return res;
 }

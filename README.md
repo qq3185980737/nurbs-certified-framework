@@ -25,7 +25,25 @@ Ablation (BVH 35.7×, adaptive multi-start −55.6% iterations, 14-DOP −52.4% 
 
 ## Quick start
 
-Interactive Web demo — open `index.html` in a browser (WASM build optional, see `build.mjs`).
+Interactive Web demo — **must be served over HTTP; do not open `index.html` directly as `file://`.** The math core is WebAssembly (`cpp/wasm/nurbs.wasm`) loaded via `fetch`, which browsers block under the `file://` protocol — the canvas and control-point inputs stay blank and you cannot type into them. Start a local server and open `index.html`:
+
+```sh
+# from the repository root
+python -m http.server 8000
+# then open in your browser
+http://localhost:8000/index.html
+```
+
+On Windows, double-click `启动服务器.bat` to start the server and open the browser automatically (a browser window will open; keep the console window open while using the app). WASM rebuild / front-end build: see `cpp/wasm/README.md` and `build.mjs`.
+
+### Web demo features
+
+The demo exposes the certified machinery directly, matching the manuscript's claims:
+
+- **All intersections, not just the closest** — the result panel lists every root inside the tolerance band (`u`, `v`, residual `|P1(u)−P2(v)|²`, point coordinates, iteration count).
+- **Condition number κ** — the root Jacobian condition number is shown; tangency / singularity reports `+∞` (the paper's κ > 10⁴ transverse-vs-tangent classifier).
+- **Certified proof summary** — a Krawczyk interval enumeration reports how many transverse roots are *proved* (`proven_count`), how many are suspected tangent / degenerate (`tangent_count`), how many boxes were evaluated, and whether the full parameter domain was covered (`complete`). Exposed in the C API as `nurbs_enumerate_intersections` and in the WASM frontend as `enumerateIntersections`.
+- Eight preset scenarios (transverse, multiple, tangent, higher-order tangent, near/far separated, endpoint, circle-vs-curve) exercise all of these outputs.
 
 C++ benchmark / test binaries live under `cpp/build` (MSVC `Release /O2 /fp:precise`):
 

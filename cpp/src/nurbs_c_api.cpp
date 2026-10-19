@@ -51,6 +51,8 @@ int copyResults(const std::vector<SolveResult>& res, NurbsSolveResult** out_resu
         arr[i].distance = res[i].distance;
         arr[i].iterations = res[i].iterations;
         arr[i].converged = res[i].converged ? 1 : 0;
+        arr[i].residual = res[i].residual;
+        arr[i].condition = res[i].conditionNumber;
     }
     *out_results = arr;
     return NURBS_OK;
@@ -179,6 +181,20 @@ int nurbs_find_all_intersections(const NurbsCurve* a, const NurbsCurve* b,
 
 void nurbs_roots_free(NurbsRoot* r) {
     std::free(r);
+}
+
+int nurbs_enumerate_intersections(const NurbsCurve* a, const NurbsCurve* b,
+                                  double leaf_tol, NurbsEnumerationResult* out) {
+    if (!a || !b || !out) return NURBS_ERR_INVALID;
+    try {
+        const double tol = leaf_tol > 0 ? leaf_tol : 1e-4;
+        GlobalEnumerationResult r = enumerateIntersections(a->impl, b->impl, tol);
+        out->proven_count = r.provenCount;
+        out->tangent_count = r.tangentCount;
+        out->evaluated_boxes = r.evaluatedBoxes;
+        out->complete = r.complete ? 1 : 0;
+        return NURBS_OK;
+    } catch (...) { return mapError(); }
 }
 
 void nurbs_set_geometry_tolerance(double v)      { setThresholds(v, std::nullopt, std::nullopt, std::nullopt, std::nullopt); }

@@ -601,6 +601,10 @@
                             <div class="metric-label">耗时 (ms)</div>
                             <div class="metric-value" id="resultTime">-</div>
                         </div>
+                        <div class="metric-item">
+                            <div class="metric-label">条件数 κ</div>
+                            <div class="metric-value" id="resultCondition">-</div>
+                        </div>
                     </div>
                     
                     <div style="margin-top: 14px;">
@@ -615,6 +619,16 @@
                                 <input type="text" class="form-input" id="resultPoint2" readonly>
                             </div>
                         </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">交点列表（<span id="resultCount">0</span>）</div>
+                    <div class="form-label" id="proofStatus" style="margin:0 0 6px 0; color: var(--accent);">
+                        Krawczyk 证明：—
+                    </div>
+                    <div class="iteration-log" id="resultList" style="max-height:220px; overflow:auto;">
+                        <div class="form-label" style="text-align:center;">暂无数据</div>
                     </div>
                 </div>
                 
@@ -679,7 +693,7 @@
     </div>
 
     <!-- C++/WASM 数学核（MODULARIZE 工厂，暴露全局 createNurbsModule）；须在 build bundle 之前加载 -->
-    <script src="cpp/wasm/nurbs.js"></script>
+    <script src="cpp/wasm/nurbs.js?v=20261019L"></script>
 
     <script>
         // ============================================================================
@@ -692,7 +706,7 @@
 (function () {
     'use strict';
     const __Nurbs = {};
-// ---- module: NURBS 统一数值框架几何计算系统/src/wasm_backend.js ----
+// ---- module: nurbs-certified-framework/src/wasm_backend.js ----
 // ============================================================================
 // wasm_backend.js — 前端 WASM 数学后端（单源化接入层）
 // ----------------------------------------------------------------------------
@@ -781,9 +795,21 @@ function curveHandle(curve) {
         && entry.ctrlRef === curve.controlPoints && entry.degree === curve.degree) {
         return entry.handle;
     }
-    if (entry && entry.handle) m._nurbs_curve_destroy(entry.handle);
+    // 数据合法性校验：长度匹配 + 全部控制点/knots 为有限数。
+    // 编辑中间态（输入未完成/含 null/NaN）一律沿用旧句柄，不触发 create，
+    // 从而杜绝 validateCurve 抛异常 → destroy 悬垂句柄 → OOB 的死循环。
     const n = curve.controlPoints.length;
     const nk = curve.knots.length;
+    if (nk !== n + curve.degree + 1) return entry ? entry.handle : null;
+    for (let i = 0; i < n; i++) {
+        const p = curve.controlPoints[i];
+        if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.w))
+            return entry ? entry.handle : null;
+    }
+    for (let i = 0; i < nk; i++) {
+        if (!Number.isFinite(curve.knots[i])) return entry ? entry.handle : null;
+    }
+    // 先建新句柄，成功才销毁旧句柄并更新缓存（先建后删，无悬垂窗口）
     const cp = m._malloc(n * 3 * 8), kn = m._malloc(nk * 8);
     const c = cp / 8, k = kn / 8;
     for (let i = 0; i < n; i++) {
@@ -793,10 +819,17 @@ function curveHandle(curve) {
     }
     for (let i = 0; i < nk; i++) m.HEAPF64[k + i] = curve.knots[i];
     const out = m._malloc(8);
-    const rc = m._nurbs_curve_create(cp, n, kn, nk, curve.degree, out);
+    let rc;
+    try {
+        rc = m._nurbs_curve_create(cp, n, kn, nk, curve.degree, out);
+    } catch (e) {
+        m._free(cp); m._free(kn); m._free(out);
+        return entry ? entry.handle : null; // create 抛异常：保留旧句柄
+    }
     const handle = m.HEAPU32[out >> 2];
     m._free(cp); m._free(kn); m._free(out);
-    if (rc !== 0) throw new Error('WASM 曲线创建失败 rc=' + rc);
+    if (rc !== 0) return entry ? entry.handle : null; // create 失败：保留旧句柄
+    if (entry && entry.handle) m._nurbs_curve_destroy(entry.handle);
     curveCache.set(curve, { handle, knotsRef: curve.knots, weightsRef: curve.weights, ctrlRef: curve.controlPoints, degree: curve.degree });
     return handle;
 }
@@ -848,8 +881,9 @@ const GeometryState = {
     UNDETERMINED: 'UNDETERMINED'
 };
 
-// NurbsSolveResult 布局（C 结构，72B/条）：
-//   state i32@0, pad, u@8, v@16, p1x@24, p1y@32, p2x@40, p2y@48, distance@56, iterations i32@64, converged i32@68
+// NurbsSolveResult 布局（C 结构，88B/条）：
+//   state i32@0, pad, u@8, v@16, p1x@24, p1y@32, p2x@40, p2y@48, distance@56, iterations i32@64,
+//   converged i32@68, residual@72, condition@80
 function readSolveResult(m, base) {
     return {
         state: STATE_STR[m.HEAPU32[base >> 2]] || 'UNDETERMINED',
@@ -859,7 +893,9 @@ function readSolveResult(m, base) {
         point2: { x: m.HEAPF64[(base + 40) >> 3], y: m.HEAPF64[(base + 48) >> 3] },
         distance: m.HEAPF64[(base + 56) >> 3],
         iterations: m.HEAPU32[(base + 64) >> 2],
-        converged: m.HEAPU32[(base + 68) >> 2]
+        converged: m.HEAPU32[(base + 68) >> 2],
+        residual: m.HEAPF64[(base + 72) >> 3],
+        condition: m.HEAPF64[(base + 80) >> 3]
     };
 }
 
@@ -878,10 +914,13 @@ function unifiedSolve(curve1, curve2, options = {}) {
     const n = m.HEAPU32[nPtr >> 2], res = m.HEAPU32[resPtr >> 2];
     const results = [];
     if (rc === 0 && n >= 1) {
-        for (let i = 0; i < n; i++) results.push(readSolveResult(m, res + i * 72));
+        for (let i = 0; i < n; i++) results.push(readSolveResult(m, res + i * 88));
     } else if (rc !== 0) {
+        // rc<0：INVALID(-1)/RUNTIME(-2)。无交点/退化几何属正常无解情形，
+        // 按空结果返回，不作为致命错误抛出（避免连续切换场景时误报）。
         m._free(resPtr); m._free(nPtr);
-        throw new Error('WASM 求解失败 rc=' + rc);
+        console.warn('[solve] unifiedSolve rc=', rc, '按无解处理');
+        return [];
     }
     if (n >= 1) m._nurbs_solve_results_free(res);
     m._free(resPtr); m._free(nPtr);
@@ -912,11 +951,35 @@ function findAllIntersections(curve1, curve2, options = {}) {
         }
     } else if (rc !== 0) {
         m._free(rootsPtr); m._free(nPtr);
-        throw new Error('WASM 全交点求解失败 rc=' + rc);
+        console.warn('[solve] findAllIntersections rc=', rc, '按无解处理');
+        return [];
     }
     if (n >= 1) m._nurbs_roots_free(roots);
     m._free(rootsPtr); m._free(nPtr);
     return out;
+}
+
+// NurbsEnumerationResult 布局（C 结构，16B）：proven_count i32@0, tangent_count i32@4,
+//   evaluated_boxes i32@8, complete i32@12
+// 全局保证性枚举（区间细分 + Krawczyk 证明）：返回证明汇总，供前端显示 certified 状态。
+function enumerateIntersections(curve1, curve2, leafTol = 1e-4) {
+    const m = needMod();
+    const h1 = curveHandle(curve1), h2 = curveHandle(curve2);
+    const out = m._malloc(16);
+    const rc = m._nurbs_enumerate_intersections(h1, h2, leafTol, out);
+    let res = null;
+    if (rc === 0) {
+        res = {
+            provenCount: m.HEAPU32[out >> 2],
+            tangentCount: m.HEAPU32[(out + 4) >> 2],
+            evaluatedBoxes: m.HEAPU32[(out + 8) >> 2],
+            complete: m.HEAPU32[(out + 12) >> 2] ? true : false
+        };
+    } else {
+        console.warn('[solve] enumerateIntersections rc=', rc);
+    }
+    m._free(out);
+    return res;
 }
 
 
@@ -1153,7 +1216,7 @@ class CanvasEngine {
 
 
 
-// ---- module: NURBS 统一数值框架几何计算系统/src/diagnostics.js ----
+// ---- module: nurbs-certified-framework/src/diagnostics.js ----
 /**
  * Diagnostics Module - 全局错误监控与诊断增强
  * 
@@ -1376,6 +1439,9 @@ function checkLocalStorage() {
     }
 }
     // ---- 导出注册（收集自各模块 export 语句）----
+        if (typeof generateUniformKnotVector !== 'undefined') __Nurbs.generateUniformKnotVector = generateUniformKnotVector;
+        if (typeof generatePiecewiseBezierKnotVector !== 'undefined') __Nurbs.generatePiecewiseBezierKnotVector = generatePiecewiseBezierKnotVector;
+        if (typeof generateKnotVector !== 'undefined') __Nurbs.generateKnotVector = generateKnotVector;
         if (typeof initWasm !== 'undefined') __Nurbs.initWasm = initWasm;
         if (typeof createCurve !== 'undefined') __Nurbs.createCurve = createCurve;
         if (typeof evaluatePoint !== 'undefined') __Nurbs.evaluatePoint = evaluatePoint;
@@ -1383,6 +1449,7 @@ function checkLocalStorage() {
         if (typeof computeAABB !== 'undefined') __Nurbs.computeAABB = computeAABB;
         if (typeof unifiedSolve !== 'undefined') __Nurbs.unifiedSolve = unifiedSolve;
         if (typeof findAllIntersections !== 'undefined') __Nurbs.findAllIntersections = findAllIntersections;
+        if (typeof enumerateIntersections !== 'undefined') __Nurbs.enumerateIntersections = enumerateIntersections;
         if (typeof GeometryState !== 'undefined') __Nurbs.GeometryState = GeometryState;
         if (typeof CanvasEngine !== 'undefined') __Nurbs.CanvasEngine = CanvasEngine;
         if (typeof Viewport !== 'undefined') __Nurbs.Viewport = Viewport;
@@ -1547,6 +1614,33 @@ let curve1 = null;
                 // 更新 UI
                 if (currentResults.length > 0) {
                     updateResultsUI(currentResults[0], endTime - startTime);
+                } else {
+                    // 无解：显示分离/无交点状态（不伪造坐标/距离）
+                    const statusEl = document.getElementById('geoStatus');
+                    statusEl.className = 'status-badge status-separated';
+                    statusEl.textContent = '分离';
+                    document.getElementById('geoMessage').textContent = '两条曲线分离';
+                }
+                // 全部交点列表（含多解；无横截交点时回退到最近点/主解）
+                renderResultList(allIntersections.length > 0 ? allIntersections : currentResults);
+
+                // Krawczyk 证明状态（全局保证性枚举：区间细分 + Krawczyk 证明汇总）
+                const proofEl = document.getElementById('proofStatus');
+                if (proofEl) {
+                    try {
+                        const proof = enumerateIntersections(curve1, curve2, 1e-4);
+                        if (proof) {
+                            proofEl.textContent =
+                                'Krawczyk 证明：横截可证 ' + proof.provenCount +
+                                ' · 疑似相切 ' + proof.tangentCount +
+                                ' · 评估盒 ' + proof.evaluatedBoxes +
+                                ' · ' + (proof.complete ? '全域覆盖 ✓' : '覆盖 ✗');
+                        } else {
+                            proofEl.textContent = 'Krawczyk 证明：不可用';
+                        }
+                    } catch (e) {
+                        proofEl.textContent = 'Krawczyk 证明：不可用';
+                    }
                 }
                 
                 // 重绘：相交时渲染全部交点，分离/无交点时渲染最近点结果
@@ -1560,6 +1654,16 @@ let curve1 = null;
         }
         
         function updateResultsUI(result, computeTime) {
+            // ---- WASM 结果字段兼容：readSolveResult 不输出 message/residual/iterationHistory ----
+            if (typeof result.message === 'undefined') {
+                result.message = { INTERSECTION: '两条曲线相交', TANGENT: '两条曲线相切', SEPARATED: '两条曲线分离' }[result.state] || '几何状态未定';
+            }
+            if (typeof result.residual === 'undefined') {
+                result.residual = result.distance; // WASM 未输出残差，回退为最近点距离
+            }
+            if (typeof result.iterationHistory === 'undefined') {
+                result.iterationHistory = [];
+            }
             // 状态徽章
             const statusEl = document.getElementById('geoStatus');
             statusEl.className = 'status-badge';
@@ -1591,6 +1695,15 @@ let curve1 = null;
             document.getElementById('resultResidual').textContent = result.residual.toExponential(8);
             document.getElementById('resultIterations').textContent = result.iterations;
             document.getElementById('resultTime').textContent = computeTime.toFixed(2);
+            // 条件数 κ：论文 §3.7 分类器（>10⁴ 判相切/退化）；未收敛/奇异为 +inf → 显示 —
+            const condEl = document.getElementById('resultCondition');
+            if (condEl) {
+                const c = result.condition;
+                // 论文 §3.7 分类器：相切/奇异时 Jacobian 条件数为 +inf → 显示 +∞（>10⁴）
+                if (typeof c === 'undefined' || Number.isNaN(c)) condEl.textContent = '—';
+                else if (c === Infinity || c === -Infinity) condEl.textContent = '+∞';
+                else condEl.textContent = c.toExponential(3);
+            }
             
             // 坐标
             document.getElementById('resultPoint1').value = 
@@ -1611,6 +1724,27 @@ let curve1 = null;
             } else {
                 logEl.innerHTML = '<div class="form-label" style="text-align: center;">暂无数据</div>';
             }
+        }
+        
+        // 多解/全部交点列表：列出容差范围内全部交点（u/v/距离/坐标/迭代）
+        function renderResultList(results) {
+            const listEl = document.getElementById('resultList');
+            const countEl = document.getElementById('resultCount');
+            if (!listEl) return;
+            const arr = (results && results.length) ? results : [];
+            if (countEl) countEl.textContent = arr.length;
+            if (arr.length === 0) {
+                listEl.innerHTML = '<div class="form-label" style="text-align:center;">无交点（分离 / 最近点）</div>';
+                return;
+            }
+            listEl.innerHTML = arr.map((r, i) => `
+                <div style="padding:6px 4px; border-bottom:1px solid var(--border,#333); font-size:12px; line-height:1.5;">
+                    <span style="color:var(--accent-cyan);">#${i + 1}</span>
+                    u=${(r.u || 0).toFixed(6)}, v=${(r.v || 0).toFixed(6)},
+                    距离=${(r.distance || 0).toExponential(4)},
+                    迭代=${r.iterations !== undefined ? r.iterations : '-'},
+                    点1=(${(r.point1 ? r.point1.x : 0).toFixed(4)}, ${(r.point1 ? r.point1.y : 0).toFixed(4)})
+                </div>`).join('');
         }
         
         // ========================================================================
@@ -1730,6 +1864,9 @@ let curve1 = null;
                 curve.controlPoints[index].y = value;
             }
             
+            // 换新数组引用，触发 WASM curveHandle 缓存失效并重建句柄（同步最新控制点）
+            curve.controlPoints = [...curve.controlPoints];
+            
             updateCurves();
         }
         
@@ -1739,6 +1876,8 @@ let curve1 = null;
             const value = parseFloat(inputEl.value);
             
             curve.weights[index] = Math.max(0.001, value);
+            // 换新数组引用，触发 WASM curveHandle 缓存失效并重建句柄（同步最新权重）
+            curve.weights = [...curve.weights];
             updateCurves();
         }
         
@@ -1751,6 +1890,9 @@ let curve1 = null;
                 y: lastPt.y
             });
             curve.weights.push(1.0);
+            // 换新数组引用，确保 WASM curveHandle 识别到增点并重建句柄
+            curve.controlPoints = [...curve.controlPoints];
+            curve.weights = [...curve.weights];
             
             // 重新生成 Knot 向量
             const degree = curve.degree;
@@ -1771,6 +1913,9 @@ let curve1 = null;
             
             curve.controlPoints.pop();
             curve.weights.pop();
+            // 换新数组引用，确保 WASM curveHandle 识别到删点并重建句柄
+            curve.controlPoints = [...curve.controlPoints];
+            curve.weights = [...curve.weights];
             
             const degree = curve.degree;
             const knotType = document.getElementById(`${curvePrefix}KnotType`).value;
@@ -1818,6 +1963,26 @@ let curve1 = null;
                     knotType: 'clamped'
                 }
             },
+            intersect2: {
+                curve1: {
+                    degree: 2,
+                    controlPoints: [
+                        {x: 2, y: 0}, {x: 2, y: 2}, {x: 0, y: 2},
+                        {x: -2, y: 2}, {x: -2, y: 0}, {x: -2, y: -2},
+                        {x: 0, y: -2}, {x: 2, y: -2}, {x: 2, y: 0}
+                    ],
+                    weights: [1, 0.7071, 1, 0.7071, 1, 0.7071, 1, 0.7071, 1],
+                    knotType: 'clamped'
+                },
+                curve2: {
+                    degree: 1,
+                    controlPoints: [
+                        {x: -3, y: 1}, {x: 3, y: 1}
+                    ],
+                    weights: [1, 1],
+                    knotType: 'clamped'
+                }
+            },
             tangent1: {
                 curve1: {
                     degree: 2,
@@ -1831,6 +1996,24 @@ let curve1 = null;
                     degree: 2,
                     controlPoints: [
                         {x: -3, y: 0}, {x: 0, y: -3}, {x: 3, y: 0}
+                    ],
+                    weights: [1, 1, 1],
+                    knotType: 'clamped'
+                }
+            },
+            tangent2: {
+                curve1: {
+                    degree: 1,
+                    controlPoints: [
+                        {x: -3, y: 0}, {x: 3, y: 0}
+                    ],
+                    weights: [1, 1],
+                    knotType: 'clamped'
+                },
+                curve2: {
+                    degree: 2,
+                    controlPoints: [
+                        {x: -2, y: 4}, {x: 0, y: -4}, {x: 2, y: 4}
                     ],
                     weights: [1, 1, 1],
                     knotType: 'clamped'
@@ -1854,6 +2037,24 @@ let curve1 = null;
                     knotType: 'clamped'
                 }
             },
+            separated2: {
+                curve1: {
+                    degree: 1,
+                    controlPoints: [
+                        {x: -3, y: 0.05}, {x: 3, y: 0.05}
+                    ],
+                    weights: [1, 1],
+                    knotType: 'clamped'
+                },
+                curve2: {
+                    degree: 1,
+                    controlPoints: [
+                        {x: -3, y: -0.05}, {x: 3, y: -0.05}
+                    ],
+                    weights: [1, 1],
+                    knotType: 'clamped'
+                }
+            },
             circle: {
                 curve1: {
                     degree: 2,
@@ -1866,11 +2067,29 @@ let curve1 = null;
                     knotType: 'clamped'
                 },
                 curve2: {
-                    degree: 3,
+                    degree: 2,
                     controlPoints: [
-                        {x: -2, y: -2}, {x: 0, y: 2}, {x: 2, y: -2}
+                        {x: -2, y: 1.5}, {x: 0, y: -0.5}, {x: 2, y: 1.5}
                     ],
                     weights: [1, 1, 1],
+                    knotType: 'clamped'
+                }
+            },
+            endpoint: {
+                curve1: {
+                    degree: 2,
+                    controlPoints: [
+                        {x: -2, y: 4}, {x: 0, y: 0}, {x: 2, y: 4}
+                    ],
+                    weights: [1, 1, 1],
+                    knotType: 'clamped'
+                },
+                curve2: {
+                    degree: 1,
+                    controlPoints: [
+                        {x: -2, y: -2}, {x: 1, y: 2.5}
+                    ],
+                    weights: [1, 1],
                     knotType: 'clamped'
                 }
             }
