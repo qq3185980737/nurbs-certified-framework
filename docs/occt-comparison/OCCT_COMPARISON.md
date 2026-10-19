@@ -66,6 +66,17 @@ Run each with the `occ` conda env's python (`/root/miniconda3/envs/occ/bin/pytho
 | two coplanar graph patches, overlap `[0.25,0.75]^2` (Section 6) | overlap region | `GeomAPI_IntSS` returns 0 lines; `BRepAlgoAPI_Section` returns only boundary edges, no face | Section 6 returns the shared region |
 | patch `S(u,v)=(u^2-v^2,2uv,u^2+v^2)` folding along `u=0` (transverse self-intersection, plus isolated parameter degeneration at origin; Section 5) | self-intersection line `x=-z, y=0` | `GeomAPI_IntSS(S,S)` returns 0 lines; `BRepCheck_Analyzer` only reports the face invalid without localizing the intersection | Section 5 detects the self-intersection and certifies the parameter pair |
 
+### Certified framework pointwise output on the same fixtures
+
+Run `cpp\tests\bench_ssi.cpp` (scene D added) for the SSI side:
+
+| Fixture | Certified cover output |
+|---|---|
+| A: `f=s^2-t^2` | 4,052 excluded / 3,070 cover boxes, band encloses the diagonal |
+| B: `f=0.3` | whole domain rejected (1 excluded box) |
+| C: `f=s+0.5t` | single corner cover box retained |
+| D: `f=(s-t)^2` degenerate tangency | **85,344 cover boxes** enclosing the whole diagonal s=t (40,188 excluded, 125,531 subdivisions) — where OCCT returns 0 lines |
+
 These are precisely the high-order-contact and small-loop configurations that [17] report commercial
 kernels ACIS and OCCT handle unsatisfactorily. The certified interval treatment of Sections 3.4/6.3
 keeps provable completeness (no-missing cover, Proposition 1) where the kernel omits a root or a
