@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NURBS WASM Frontend Stress Test</title>
+<style>
+body{font-family:Consolas,Menlo,monospace;background:#0f1115;color:#e6e6e6;padding:20px;max-width:900px;margin:0 auto}
+h2{color:#5b9bd5}
+#log{white-space:pre-wrap;line-height:1.45;font-size:13px}
+.ok{color:#6fce8f}.bad{color:#ff6b6b}.warn{color:#ffd479}
+table{border-collapse:collapse;margin:10px 0}
+td,th{border:1px solid #333;padding:4px 10px;text-align:left}
+</style>
+</head>
+<body>
+<h2>NURBS WASM Frontend Stress Test</h2>
+<p id="log">loading…</p>
+
+<script src="cpp/wasm/nurbs.js"></script>
+<script>
+"use strict";
+// 覆盖 window.alert：收集弹窗但不真正弹出（前端压力回归关键检查点）
+window.__alerts = [];
+const _origAlert = window.alert;
+window.alert = function (m) { window.__alerts.push(String(m)); console.log('[ALERT-CAPTURED]', m); };
+
+const logEl = document.getElementById('log');
+function log(t, cls) {
+    const el = document.createElement('div');
+    el.textContent = t;
+    if (cls) el.className = cls;
+    logEl.appendChild(el);
+}
+
+// ---- 可复现 PRNG（与 batch_test.mjs 同种子）----
+function mulberry32(seed) { let a = seed >>> 0; return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const SEED = 20261012, rnd = mulberry32(SEED);
+const rand = (lo, hi) => lo + (hi - lo) * rnd();
+const randInt = (lo, hi) => Math.floor(rand(lo, hi + 1));
+
+// ---- 计数 ---- 
+const N_COMBO = 10;               // 每类组合数
+const N_RANDOM = 300;             // 随机压力对数
+let total = 0, exceptions = 0, cErrors = 0, alerts = 0;
+const groupStat = {};
+
+// ============================================================================
+// C API minimal wrapper（直接经 createNurbsModule，绕过 ESM 模块作用域）
+// ============================================================================
+let m = null;
+
+// 构造 NURBS 曲线（clamped），返回句柄或 null
+function makeCurve(pts, weights, knots, degree) {
+    const n = pts.length;
+    const ctrl = m._malloc(n * 24);
+    if (!ctrl) { cErrors++; throw new Error('malloc ctrl failed'); }
+    for (let i = 0; i < n; i++) {
+        const o = ctrl + i * 24;
+        m.HEAPF64[(o) >> 3] = pts[i].x;
+        m.HEAPF64[(o + 8) >> 3] = pts[i].y;
+        m.HEAPF64[(o + 16) >> 3] = weights[i];
+    }
+    const kp = m._malloc(knots.length * 8);
+    for (let i = 0; i < knots.length; i++) m.HEAPF64[(kp + i * 8) >> 3] = knots[i];
+    const out = m._malloc(8);
+    const rc = m._nurbs_curve_create(ctrl, n, kp, knots.length, degree, out);
+    m._free(ctrl); m._free(kp);
+    const h = rc === 0 ? m.HEAPU32[out >> 2] : null;
+    m._free(out);
+    if (rc !== 0) { cErrors++; return null; }
+    return h;
+}
+
+// unifiedSolve（nurbs_unified_solve_ex），返回状态数组或空
+function uniSolve(h1, h2) {
+    const resPtr = m._malloc(8), nPtr = m._malloc(4);
+    const rc = m._nurbs_unified_solve_ex(h1, h2, 1, 6, 80, 0, resPtr, nPtr);
+    const n = m.HEAPU32[nPtr >> 2], res = m.HEAPU32[resPtr >> 2];
+    const states = [];
+    if (rc === 0 && n >= 1) {
+        for (let i = 0; i < n; i++) {
+            const b = res + i * 88;
+            states.push(m.HEAPU32[b >> 2]);
+        }
+    } else if (rc !== 0) { cErrors++; }
+    if (n >= 1) m._nurbs_solve_results_free(res);
+    m._free(resPtr); m._free(nPtr);
+    return { rc, n, states };
+}
+
+// find_all_intersections（全部交点）
+function findAll(h1, h2) {
+    const rootsPtr = m._malloc(8), nPtr = m._malloc(4);
+    const rc = m._nurbs_find_all_intersections(h1, h2, rootsPtr, nPtr);
+    const n = m.HEAPU32[nPtr >> 2], roots = m.HEAPU32[rootsPtr >> 2];
+    let cnt = 0;
+    if (rc === 0 && n >= 1) cnt = n;
+    else if (rc !== 0) cErrors++;
+    if (n >= 1) m._nurbs_roots_free(roots);
+    m._free(rootsPtr); m._free(nPtr);
+    return cnt;
+}
+
+function runPair(group, mkPair) {
+    total++;
+    let h1 = null, h2 = null;
+    try {
+        const p = mkPair();
+        h1 = p.curve1; h2 = p.curve2;
+        const s = uniSolve(h1, h2);
+        // 即使无交点也调 find_all（分离/相切也应不抛异常）
+        const nc = findAll(h1, h2);
+        groupStat[group] = groupStat[group] || { n: 0, exc: 0, cErr: 0, geo: 0 };
+        groupStat[group].n++;
+        if (s.rc !== 0 || s.states.length === 0) groupStat[group].geo++;
+        // 记录弹窗（alert 拦截）
+        if (window.__alerts.length > alerts) { alerts = window.__alerts.length; groupStat[group].cErr += (alerts); }
+    } catch (e) {
+        exceptions++;
+        groupStat[group] = groupStat[group] || { n: 0, exc: 0, cErr: 0, geo: 0 };
+        groupStat[group].exc++;
+        console.error('[STRESS EXC]', group, e.message);
+    } finally {
+        if (h1) m._nurbs_curve_destroy(h1);
+        if (h2) m._nurbs_curve_destroy(h2);
+    }
+}
+
+// ============================================================================
+// 用例生成器（与 batch_test.mjs 同构造，保证覆盖性）
+// ============================================================================
+function randomCurve() {
+    const n = randInt(4, 7), degree = randInt(2, Math.min(3, n - 1));
+    const knots = uniformKnot(n, degree);
+    const pts = [], weights = []; let x = rand(-1, 1), y = rand(-1, 1);
+    for (let i = 0; i < n; i++) { x += rand(-0.8, 0.8); y += rand(-0.8, 0.8); pts.push({ x, y }); weights.push(rand(0.5, 1.5)); }
+    return makeCurve(pts, weights, knots, degree);
+}
+function uniformKnot(n, p) { const k = new Array(n + p + 1); for (let i = 0; i <= p; i++) k[i] = 0; for (let i = n; i <= n + p; i++) k[i] = 1; const ik = n - p - 1; if (ik > 0) { const s = 1 / (ik + 1); for (let i = 1; i <= ik; i++) k[p + i] = i * s; } return k; }
+function makeSharedPair(tangent) {
+    const n1 = randInt(4, 7), d1 = randInt(2, Math.min(3, n1 - 1));
+    const n2 = randInt(4, 7), d2 = randInt(2, Math.min(3, n2 - 1));
+    const shared = { x: rand(-1.5, 1.5), y: rand(-1.5, 1.5) };
+    const tA = rand(0, 2 * Math.PI), dir = { x: Math.cos(tA), y: Math.sin(tA) };
+    const c2Dir = tangent ? dir : { x: -dir.y, y: dir.x };
+    const mk = (n, d, isFirst) => {
+        const knots = uniformKnot(n, d), pts = [], weights = [];
+        let x = shared.x, y = shared.y;
+        for (let i = 0; i < n; i++) {
+            if (i === 0 && isFirst) pts.push({ ...shared });
+            else if (i === n - 1 && !isFirst) pts.push({ ...shared });
+            else if (i === 1 && isFirst) { pts.push({ x: shared.x + dir.x * rand(0.3, 1.0), y: shared.y + dir.y * rand(0.3, 1.0) }); x = pts[pts.length - 1].x; y = pts[pts.length - 1].y; }
+            else if (i === n - 2 && !isFirst) { pts.push({ x: shared.x + c2Dir.x * rand(0.3, 1.0), y: shared.y + c2Dir.y * rand(0.3, 1.0) }); x = pts[pts.length - 1].x; y = pts[pts.length - 1].y; }
+            else { x += rand(-0.9, 0.9); y += rand(-0.9, 0.9); pts.push({ x, y }); }
+            weights.push(tangent ? 1.0 : rand(0.5, 1.5));
+        }
+        return makeCurve(pts, weights, knots, d);
+    };
+    return { curve1: mk(n1, d1, true), curve2: mk(n2, d2, false) };
+}
+function mkSeparated() {
+    const n = randInt(4, 7), degree = randInt(2, Math.min(3, n - 1));
+    const knots = uniformKnot(n, degree), pts = [], weights = [];
+    let x = rand(-1, 1), y = rand(-1, 1);
+    for (let i = 0; i < n; i++) { x += rand(-0.8, 0.8); y += rand(-0.8, 0.8); pts.push({ x, y }); weights.push(rand(0.5, 1.5)); }
+    const dx = 8; // 整体平移 → 包围盒分离，真不相交
+    const c2pts = pts.map(p => ({ x: p.x + dx, y: p.y }));
+    return { curve1: makeCurve(pts, weights, knots, degree), curve2: makeCurve(c2pts, weights, knots, degree) };
+}
+function mkNear() {
+    const n = randInt(4, 7), degree = randInt(2, Math.min(3, n - 1));
+    const knots = uniformKnot(n, degree), pts = [], weights = [];
+    let x = rand(-1, 0.2), y = rand(-1, 1);
+    for (let i = 0; i < n; i++) { x += rand(0.4, 0.9); y += rand(-0.8, 0.8); pts.push({ x, y }); weights.push(rand(0.5, 1.5)); }
+    const offset = rand(0.02, 0.06);
+    const c2pts = pts.map(p => ({ x: p.x, y: p.y + offset }));
+    return { curve1: makeCurve(pts, weights, knots, degree), curve2: makeCurve(c2pts, weights, knots, degree) };
+}
+
+// ============================================================================
+// 主流程
+// ============================================================================
+async function run() {
+    m = await createNurbsModule();
+    log('WASM module loaded. Seed=' + SEED);
+    log('=== 组合测例（每类 ' + N_COMBO + ' 对）===');
+
+    const groups = [
+        ['intersect',  () => makeSharedPair(false)],
+        ['tangent',    () => makeSharedPair(true)],
+        ['high_order', () => makeSharedPair(false)],
+        ['separated',  mkSeparated],
+        ['near',       mkNear],
+        ['random',     randomCurvePair]
+    ];
+    function randomCurvePair() { return { curve1: randomCurve(), curve2: randomCurve() }; }
+
+    for (const [g, mk] of groups) {
+        for (let i = 0; i < N_COMBO; i++) runPair(g, mk);
+    }
+    log('=== 随机压力 ' + N_RANDOM + ' 对 ===');
+    for (let i = 0; i < N_RANDOM; i++) runPair('random', randomCurvePair);
+
+    // 汇总
+    log('');
+    log('=== 结果汇总 ===');
+    log('总对: ' + total + ' | 异常(exception): ' + exceptions + ' | C层错误(rc≠0): ' + cErrors + ' | 弹窗(alert): ' + window.__alerts.length);
+    const tbl = document.createElement('table');
+    tbl.innerHTML = '<tr><th>组</th><th>对数</th><th>异常</th><th>C层错误</th></tr>';
+    for (const [g, s] of Object.entries(groupStat)) {
+        const r = document.createElement('tr');
+        r.innerHTML = '<td>' + g + '</td><td>' + s.n + '</td><td class="' + (s.exc ? 'bad' : 'ok') + '">' + s.exc + '</td><td class="' + (s.cErr ? 'bad' : 'ok') + '">' + s.cErr + '</td>';
+        tbl.appendChild(r);
+    }
+    logEl.appendChild(tbl);
+    if (window.__alerts.length) {
+        log('捕获到 ' + window.__alerts.length + ' 次弹窗：', 'bad');
+        window.__alerts.forEach((a, i) => log('  [' + i + '] ' + a, 'bad'));
+    } else {
+        log('未捕获到任何弹窗 ✓', 'ok');
+    }
+    const pass = exceptions === 0 && cErrors === 0 && window.__alerts.length === 0;
+    log('STRESS TEST: ' + (pass ? 'ALL PASS ✓' : 'HAS FAILURES ✗'), pass ? 'ok' : 'bad');
+}
+run().catch(e => log('FATAL: ' + e.message, 'bad'));
+</script>
+</body>
+</html>
