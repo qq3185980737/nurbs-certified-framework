@@ -13,6 +13,7 @@
 
 using P3 = nurbs::SurfacePoint;
 using SurfacePoint = nurbs::SurfacePoint;
+static int g_pass = 0, g_fail = 0;
 struct I3 { double lo, hi; I3(double l=0,double h=0):lo(l),hi(h){} double mid()const{return 0.5*(lo+hi);} };
 struct Int3 { I3 x, y, z; };
 
@@ -130,6 +131,7 @@ static void run(const char* label, const Bezier3& C, const nurbs::NurbsSurface& 
     int r = proveCS(C, S, ub, sb, tb);
     printf("  %-30s δ=%.0e → %s（期望 %s）%s\n", label, delta,
            r == 1 ? "已证明" : "未证", expect == 1 ? "证" : "拒", r == expect ? " ✓" : " ✗");
+    if (r == expect) ++g_pass; else ++g_fail;
 }
 
 int main() {
@@ -163,7 +165,22 @@ int main() {
         Bezier3 C; C.P = { {-0.4,0,0.25}, {0.4,0,0.25} };   // C=(u',0,0.25) ⊂ 平面 y=0
         run("曲线在面内", C, S, 0.5, 0.5, 0.5, 1e-2, 0);   // 重叠非孤立解 → 不证
     }
+    // 场景 5：批量 93 组竖直曲线 C(u)=(0,u-0.5,z0) 穿过 xz 平面（z0∈[0.01,0.49]，横截）
+    {
+        printf("\n[5] 批量 93 组竖直曲线横截穿面（z0∈[0.01,0.49]）\n");
+        const int N = 93; int okN = 0;
+        for (int kk = 0; kk < N; ++kk) {
+            const double z0 = 0.01 + 0.48 * kk / (N - 1);
+            const double t0 = 2 * z0;                 // patch z=0.5t → 曲线 z=z0 交点 t=2z0
+            Bezier3 C; C.P = { {0,-0.5,z0}, {0,0.5,z0} };
+            I3 ub(0.5-1e-3,0.5+1e-3), sb(0.5-1e-3,0.5+1e-3), tb(t0-1e-3,t0+1e-3);
+            if (proveCS(C, S, ub, sb, tb)) ++okN;
+        }
+        printf("      批量 93/93 曲线穿面横截证明: %d\n", okN);
+        g_pass += okN; g_fail += (N - okN);
+    }
     printf("\n结论：曲线-曲面求交（方系统 R³→R³）由 3×3 Krawczyk 保证；横截证明、相切/退化重叠/非交不误证。\n");
     printf("      曲面表示统一为 nurbs::NurbsSurface（双线性 makeBilinear）。\n");
-    return 0;
+    printf("      通过 %d，失败 %d。\n", g_pass, g_fail);
+    return g_fail ? 1 : 0;
 }

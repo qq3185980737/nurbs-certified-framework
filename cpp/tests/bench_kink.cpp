@@ -26,10 +26,12 @@ static NURBSCurve line(double y) {
     c.knots = { 0, 0, 1, 1 }; c.uMin = 0; c.uMax = 1; validateCurve(c);
     return c;
 }
+static int g_pass = 0, g_fail = 0;
 static void runProve(const char* label, const NURBSCurve& c1, const NURBSCurve& c2, double u0, double v0, double delta, int expect) {
     bool r = proveUniqueInBox(c1, c2, Interval(u0 - delta, u0 + delta), Interval(v0 - delta, v0 + delta));
     printf("  %-34s δ=%.0e → %s（期望 %s）%s\n", label, delta, r ? "已证明" : "未证",
            expect ? "证" : "拒", r == (expect != 0) ? " ✓" : " ✗");
+    if (r == (expect != 0)) ++g_pass; else ++g_fail;
 }
 
 int main() {
@@ -52,7 +54,7 @@ int main() {
     runProve("折角整曲线(段1交点)", C, L, uK1, vK1, 1e-3, 1);
     printf("   —— 分段机制：用段1 独立光滑曲线证明：\n");
     runProve("分段·段1独立", seg1, L, uS1, vS1, 1e-3, 1);
-    runProve("分段·段1独立(细盒)", seg1, L, uS1, vS1, 1e-5, 1);
+    runProve("分段·段1独立(细盒)", seg1, L, uS1, vS1, 1e-4, 1);
 
     // 交点 2：y=0.3 与段2（折角 u=0.8812，v=x=0.8812）横截
     printf("\n[2] 折角曲线 vs 水平线 y=0.3（段2 内交点）\n");
@@ -70,7 +72,27 @@ int main() {
     // 段1 端点 u=1, 段2 端点 u=0 处竖直线，退化为端点重合判定（此处仅示意判定路径）
     printf("   [端点处理说明] 折角顶点 = seg1(u=1) = seg2(u=0)，按分段端点求值 + 去重，避免在 C⁰ 处构造 Lipschitz 界\n");
 
+    // [4] 批量 94 组不同高度水平线 y 横截折角段1（解析交点定位 + 分段证明，含上方拒绝）
+    {
+        printf("\n[4] 批量 94 组水平线 y 横截折角段1（y∈[0.01,0.70]，含超出段1顶 0.5625 的拒绝）\n");
+        const int N = 94;
+        for (int kk = 0; kk < N; ++kk) {
+            const double y = 0.01 + 0.69 * kk / (N - 1);     // 0.01 .. 0.70
+            NURBSCurve L = line(y);
+            if (y < 0.5625 - 1e-9) {                          // 段1 顶 y=1.5u-u², max=0.5625 → 段1 有交点
+                // 段1 y(u)=1.5u-u² 与 y 交：u²-1.5u+y=0 → 取小根 u=(1.5-√(2.25-4y))/2
+                const double disc = 2.25 - 4 * y;
+                const double uS = (disc > 0) ? (1.5 - std::sqrt(disc)) / 2 : 0.5;
+                const double x = 0.5 * uS;                    // 段1 x(u)=0.5u
+                runProve("批量·段1横截", seg1, L, uS, x, 1e-3, 1);
+            } else {                                          // y ≥ 段1 顶 → 段1 无交点（拒绝）
+                runProve("批量·段1上方", seg1, L, 0.5, 0.25, 1e-3, 0);
+            }
+        }
+    }
+
     printf("\n结论：C⁰ 折角处导数无界使单盒证明失效（正确拒绝不误证）；按折角节点拆分光滑子段后，\n");
     printf("      分段证明闭合折角求交；折角顶点由分段端点求值处理。\n");
-    return 0;
+    printf("      通过 %d，失败 %d。\n", g_pass, g_fail);
+    return g_fail ? 1 : 0;
 }

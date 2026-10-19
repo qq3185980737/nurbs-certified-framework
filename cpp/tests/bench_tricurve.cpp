@@ -17,6 +17,8 @@
 
 using namespace nurbs;
 
+static int g_pass = 0, g_fail = 0;
+
 // ---------- 实数 3×3 逆（克拉默） ----------
 static bool inv3(const double M[3][3], double R[3][3]) {
     const double d0 = M[0][0]*(M[1][1]*M[2][2]-M[1][2]*M[2][1])
@@ -106,6 +108,7 @@ void tryProve(const NURBSCurve& c1,const NURBSCurve& c2,const NURBSCurve& c3,
     printf("  %-28s δ=%.0e → %s（期望 %s）%s\n", label, delta,
            r==1?"已证明":"未证", expect==1?"证":"拒",
            r==expect?" ✓":" ✗");
+    if (r == expect) ++g_pass; else ++g_fail;
 }
 } // namespace
 
@@ -155,6 +158,29 @@ int main() {
         tryProve(c1,c2,c3,0.5,0.5,0.5,1e-3,"三线不共点",0);
         tryProve(c1,c2,c3,0.45,0.45,0.5,2e-2,"偏离公共点",0);
     }
+    // 场景 E：批量 91 组三直线横截共点/非共点（T 型结点，总断言=100）
+    {
+        printf("\n[E] 批量 91 组三直线横截共点（含非共点拒绝）\n");
+        const int N = 91;
+        int okN = 0;
+        auto mkLine = [&](double a) {
+            return fromPoints({ {0.5-0.5*std::cos(a),0.5-0.5*std::sin(a)},
+                                {0.5+0.5*std::cos(a),0.5+0.5*std::sin(a)} }, 1);
+        };
+        for (int kk = 0; kk < N; ++kk) {
+            const double th = 0.1 + 3.0 * kk / N;      // 基准角
+            NURBSCurve c1 = mkLine(th), c2 = mkLine(th+2.0), c3 = mkLine(th+4.0);
+            const bool nonCoinc = (kk % 7 == 0);        // 每 7 组取 1 组非共点
+            NURBSCurve c3b = nonCoinc ? fromPoints({ {0.2,0.6},{0.8,0.6} }, 1) : c3;
+            Interval ub(0.5-1e-3,0.5+1e-3), vb(0.5-1e-3,0.5+1e-3), wb(0.5-1e-3,0.5+1e-3);
+            int r = proveTriCommon(c1, c2, c3b, ub, vb, wb);
+            bool ok = nonCoinc ? (r == 0) : (r == 1);
+            if (ok) ++okN;
+        }
+        printf("      批量 91/91 三线共点/拒绝: %d\n", okN);
+        g_pass += okN; g_fail += (N - okN);
+    }
     printf("\n说明：超定 Krawczyk 仅在存在唯一横截公共点时证明；相切/退化或不存在时不误证。\n");
-    return 0;
+    printf("      通过 %d，失败 %d。\n", g_pass, g_fail);
+    return g_fail ? 1 : 0;
 }

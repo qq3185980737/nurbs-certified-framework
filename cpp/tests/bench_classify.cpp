@@ -13,6 +13,8 @@
 
 using namespace nurbs;
 
+static int g_pass = 0, g_fail = 0;
+
 namespace {
 NURBSCurve fromPoints(const std::vector<Point2>& pts, int degree) {
     NURBSCurve c;
@@ -53,6 +55,9 @@ int main() {
             printf("   (u=%.4f,v=%.4f) kind=%s det=%.3e cond=%.1f backwardErr=%.2e\n",
                    c.u, c.v, kindName(c.kind), c.det, c.cond, c.distance);
         printf("   重叠检测: %s\n", detectOverlap(c1, c2) ? "是" : "否");
+        bool ok = !cls.empty();
+        for (auto& c : cls) if (c.kind != IntersectionKind::TRANSVERSE) ok = false;
+        g_pass += ok ? 1 : 0; g_fail += ok ? 0 : 1;
     }
 
     // ---- 相切场景：抛物线顶点与水平线相切 ----
@@ -66,6 +71,9 @@ int main() {
         for (auto& c : cls)
             printf("   (u=%.4f,v=%.4f) kind=%s det=%.3e cond=%.3e backwardErr=%.2e\n",
                    c.u, c.v, kindName(c.kind), c.det, c.cond, c.distance);
+        bool ok = !cls.empty();
+        for (auto& c : cls) if (c.kind != IntersectionKind::TANGENT) ok = false;
+        g_pass += ok ? 1 : 0; g_fail += ok ? 0 : 1;
     }
 
     // ---- 重叠场景：同一曲线对（完全重叠）----
@@ -73,6 +81,8 @@ int main() {
         NURBSCurve c1 = fromPoints({ {0, 0.3}, {0.4, 0.9}, {0.8, -0.2}, {1, 0.5} }, 3);
         printf("[重叠] 同一曲线对: detectOverlap=%s（应识别，避免海量噪声交点）\n",
                detectOverlap(c1, c1) ? "是" : "否");
+        bool ok = detectOverlap(c1, c1);
+        g_pass += ok ? 1 : 0; g_fail += ok ? 0 : 1;
     }
 
     // ---- 综合：随机 60 对，统计横截/相切/条件数/证明覆盖 ----
@@ -105,5 +115,29 @@ int main() {
         printf("   横截 %d / 相切 %d / 共 %d；横截证明覆盖 %d/%d (%.1f%%)；最大条件数 %.2e\n",
                tr, tan, tot, prov, tr, tr ? 100.0 * prov / tr : 0, maxCond);
     }
-    return 0;
+
+    // ---- 批量 97 组：抛物线 y=u(1-u) × 水平线 y=t（t∈[0.01,0.24]，两横截交点），断言分类+证明 ----
+    {
+        printf("\n[批量] 97 组抛物线 × 水平线（横截交点分类 TRANSVERSE + Krawczyk 证明）\n");
+        const int N = 97; int okN = 0;
+        for (int kk = 0; kk < N; ++kk) {
+            const double t = 0.01 + 0.23 * kk / (N - 1);
+            NURBSCurve c1 = fromPoints({ {0, 0}, {0.5, 0.5}, {1, 0} }, 2);  // y=u(1-u), 顶 0.25
+            NURBSCurve c2 = fromPoints({ {0, t}, {1, t} }, 1);              // 水平线 y=t
+            BVHIndex ia, ib; ia.build(c1, 7); ib.build(c2, 7);
+            auto sol = solveWithIndex(ia, c1, ib, c2, opt, 1);
+            auto cls = classifySolutions(c1, c2, sol);
+            bool ok = !cls.empty();
+            for (auto& c : cls) {
+                if (c.kind != IntersectionKind::TRANSVERSE) ok = false;
+                if (!proveUniqueInBox(c1, c2, Interval(c.u - 1e-3, c.u + 1e-3), Interval(c.v - 1e-3, c.v + 1e-3))) ok = false;
+            }
+            if (ok) ++okN;
+        }
+        printf("      批量 97/97 横截分类+证明: %d\n", okN);
+        g_pass += okN; g_fail += (N - okN);
+    }
+    printf("\n结论：横截交点 |det(J)| 大 → TRANSVERSE 且可被 Krawczyk 证明；相切 → TANGENT（不误证）；重叠段 → OVERLAP。\n");
+    printf("      通过 %d，失败 %d。\n", g_pass, g_fail);
+    return g_fail ? 1 : 0;
 }

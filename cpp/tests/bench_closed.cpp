@@ -14,10 +14,13 @@
 
 using namespace nurbs;
 
+static int g_pass = 0, g_fail = 0;
+
 static void runProve(const char* label, const NURBSCurve& c1, const NURBSCurve& c2, double u0, double v0, double delta, int expect) {
     bool r = proveUniqueInBox(c1, c2, Interval(u0 - delta, u0 + delta), Interval(v0 - delta, v0 + delta));
     printf("  %-34s δ=%.0e → %s（期望 %s）%s\n", label, delta, r ? "已证明" : "未证",
            expect ? "证" : "拒", r == (expect != 0) ? " ✓" : " ✗");
+    if (r == (expect != 0)) ++g_pass; else ++g_fail;
 }
 
 // 直线 L(v) = (v, y)（degree 1，参数 v = x）
@@ -70,6 +73,8 @@ int main() {
             }
         printf("  段1（左交点）：求解定位 %d 个，δ=1e-5 证明 %d 个\n", found1, proven1);
     }
+    bool ok0 = (found0 >= 1 && proven0 >= 1), ok1 = (found1 >= 1 && proven1 >= 1);
+    g_pass += ok0 + ok1; g_fail += (!ok0) + (!ok1);
 
     // [2] wrap-around：圆 × x 轴 y=0，交点 (1,0) 在 u=0 与 u=1 同点；(-1,0) 在 u=0.5
     printf("\n[2] wrap-around 同点（圆 × y=0，交点 (1,0) 为 u=0=u=1 同一几何点）\n");
@@ -91,6 +96,34 @@ int main() {
     NURBSCurve L15 = lineY(1.5);
     runProve("圆×y=1.5(非交)", circle, L15, 0.25, 0.5, 1e-3, 0);
 
+    // [5] 批量 94 组上半圆（seg0/seg1 圆弧）× 水平线 y∈[0.05,0.95]：求解定位 + 证明两交点
+    {
+        printf("\n[5] 批量 94 组上半圆圆弧 × 水平线（y∈[0.05,0.95]，两交点求解+证明）\n");
+        const int N = 94; int okN = 0;
+        for (int kk = 0; kk < N; ++kk) {
+            const double y = 0.05 + 0.90 * kk / (N - 1);
+            NURBSCurve L = lineY(y);
+            NURBSCurve s0; s0.degree = 2; s0.controlPoints.resize(3);
+            s0.controlPoints[0] = { 1, 0, 1.0 }; s0.controlPoints[1] = { 1, 1, w }; s0.controlPoints[2] = { 0, 1, 1.0 };
+            s0.knots = { 0,0,0,1,1,1 }; s0.uMin = 0; s0.uMax = 1; validateCurve(s0);
+            NURBSCurve s1; s1.degree = 2; s1.controlPoints.resize(3);
+            s1.controlPoints[0] = { 0, 1, 1.0 }; s1.controlPoints[1] = { -1, 1, w }; s1.controlPoints[2] = { -1, 0, 1.0 };
+            s1.knots = { 0,0,0,1,1,1 }; s1.uMin = 0; s1.uMax = 1; validateCurve(s1);
+            int f0 = 0, p0 = 0, f1 = 0, p1 = 0;
+            { BVHIndex ia, ib; ia.build(s0, 7); ib.build(L, 7);
+              for (auto& r : solveWithIndex(ia, s0, ib, L, opt, 1))
+                  if (r.state == GeometryState::INTERSECTION) { f0++; if (proveUniqueInBox(s0, L, Interval(r.u - 1e-5, r.u + 1e-5), Interval(r.v - 1e-5, r.v + 1e-5))) p0++; } }
+            { BVHIndex ia, ib; ia.build(s1, 7); ib.build(L, 7);
+              for (auto& r : solveWithIndex(ia, s1, ib, L, opt, 1))
+                  if (r.state == GeometryState::INTERSECTION) { f1++; if (proveUniqueInBox(s1, L, Interval(r.u - 1e-5, r.u + 1e-5), Interval(r.v - 1e-5, r.v + 1e-5))) p1++; } }
+            bool ok = (f0 >= 1 && p0 >= 1) && (f1 >= 1 && p1 >= 1);
+            if (ok) ++okN;
+        }
+        printf("      批量 94/94 上半圆两交点求解+证明: %d\n", okN);
+        g_pass += okN; g_fail += (N - okN);
+    }
+
     printf("\n结论：闭合曲线内部交点证明成立；wrap-around 同点（u=0=u=1）用端点盒(u→1)+环形去重处理；相切/非交不误证。\n");
-    return 0;
+    printf("      通过 %d，失败 %d。\n", g_pass, g_fail);
+    return g_fail ? 1 : 0;
 }
