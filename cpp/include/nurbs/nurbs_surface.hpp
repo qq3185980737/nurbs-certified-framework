@@ -244,6 +244,29 @@ struct NurbsSurface {
         }
         return s;
     }
+
+    // Upper unit sphere (radius R): surface of revolution. u = full circle
+    // (9 spliced 90-degree rational arcs, closed S(0,v)==S(1,v)), v = 90-degree
+    // meridian arc from equator (z=0) to north pole (z=R). Biquadratic rational,
+    // weight = wu[i]*wv[j] (tensor product of a revolution body).
+    static NurbsSurface makeSphere(double R) {
+        NurbsSurface s; s.nu = 9; s.nv = 3; s.pu = 2; s.pv = 2;
+        s.uKnots = {0,0,0, 0.25,0.25, 0.5,0.5, 0.75,0.75, 1,1,1};
+        s.vKnots = {0,0,0, 1,1,1};
+        const double r2 = std::sqrt(0.5);
+        const double wu[9] = {1.0, r2, 1.0, r2, 1.0, r2, 1.0, r2, 1.0};   // u full circle
+        const double wv[3] = {1.0, r2, 1.0};                              // v 90-deg meridian
+        const double cx[9] = { R, R, 0, -R, -R, -R, 0, R, R };
+        const double cy[9] = { 0, R, R, R, 0, -R, -R, -R, 0 };
+        const double rz[3][2] = { {R,0}, {R,R}, {0,R} };                  // meridian ctrl pts (r,z)
+        s.C.resize(27); s.w.resize(27);
+        for (int j = 0; j < 3; ++j) for (int i = 0; i < 9; ++i) {
+            const double fr = rz[j][0] / R;                              // r_j/R
+            s.C[j*9+i] = { cx[i] * fr, cy[i] * fr, rz[j][1] };
+            s.w[j*9+i] = wu[i] * wv[j];
+        }
+        return s;
+    }
 };
 
 } // namespace nurbs
