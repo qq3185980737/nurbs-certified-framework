@@ -1,15 +1,18 @@
 // ============================================================================
-// bench_cs.cpp — 扩展：3D 曲线-曲面求交（方系统 R³→R³，Krawczyk 证明）
+// bench_cs.cpp — 扩展：3D 曲线-曲面求交（方系统 R³→R³，Krawczyk 证明，迁移到统一 NurbsSurface）
 //   曲线 C(u)⊂R³ 与双线性 Bezier 曲面 S(s,t)⊂R³ 求交：F(u,s,t)=C(u)−S(s,t)=0，
 //   3 方程 3 未知 → 方系统，用 3×3 区间 Krawczyk 证明交点存在唯一。
 //   这是 CAD 最经典原语（曲线与曲面交点），把保证性框架从曲线-曲线推到曲线-曲面。
+//   曲面统一存储结构：nurbs/NurbsSurface（双线性 makeBilinear）。
 // 自包含（不动主库）。
 // ============================================================================
 #include <cstdio>
 #include <cmath>
 #include <vector>
+#include "nurbs/nurbs_surface.hpp"
 
-struct P3 { double x, y, z; };
+using P3 = nurbs::SurfacePoint;
+using SurfacePoint = nurbs::SurfacePoint;
 struct I3 { double lo, hi; I3(double l=0,double h=0):lo(l),hi(h){} double mid()const{return 0.5*(lo+hi);} };
 struct Int3 { I3 x, y, z; };
 
@@ -51,34 +54,24 @@ struct Bezier3 {
     }
 };
 
-// ---------- 双线性 Bezier 曲面 ----------
-struct Patch {
-    P3 P00, P10, P01, P11;
-    P3 eval(double s, double t) const {
-        const double w0 = (1 - s) * (1 - t), w1 = s * (1 - t), w2 = (1 - s) * t, w3 = s * t;
-        return { w0 * P00.x + w1 * P10.x + w2 * P01.x + w3 * P11.x,
-                 w0 * P00.y + w1 * P10.y + w2 * P01.y + w3 * P11.y,
-                 w0 * P00.z + w1 * P10.z + w2 * P01.z + w3 * P11.z };
-    }
-    P3 derivS(double s, double t) const {  // ∂S/∂s
-        return { (1 - t) * (P10.x - P00.x) + t * (P11.x - P01.x),
-                 (1 - t) * (P10.y - P00.y) + t * (P11.y - P01.y),
-                 (1 - t) * (P10.z - P00.z) + t * (P11.z - P01.z) };
-    }
-    P3 derivT(double s, double t) const {  // ∂S/∂t
-        return { (1 - s) * (P01.x - P00.x) + s * (P11.x - P10.x),
-                 (1 - s) * (P01.y - P00.y) + s * (P11.y - P10.y),
-                 (1 - s) * (P01.z - P00.z) + s * (P11.z - P10.z) };
-    }
-    Int3 derivSRange() const { // ∂S/∂s 界（(P10−P00),(P11−P01) 凸包）
-        P3 A{ P10.x - P00.x, P10.y - P00.y, P10.z - P00.z }, B{ P11.x - P01.x, P11.y - P01.y, P11.z - P01.z };
-        return { { std::min(A.x, B.x), std::max(A.x, B.x) }, { std::min(A.y, B.y), std::max(A.y, B.y) }, { std::min(A.z, B.z), std::max(A.z, B.z) } };
-    }
-    Int3 derivTRange() const {
-        P3 C{ P01.x - P00.x, P01.y - P00.y, P01.z - P00.z }, D{ P11.x - P10.x, P11.y - P10.y, P11.z - P10.z };
-        return { { std::min(C.x, D.x), std::max(C.x, D.x) }, { std::min(C.y, D.y), std::max(C.y, D.y) }, { std::min(C.z, D.z), std::max(C.z, D.z) } };
-    }
-};
+// ---------- 双线性 NurbsSurface 的偏导全定义域界（由控制点凸包给出） ----------
+static Int3 derivSRange(const nurbs::NurbsSurface& S) { // ∂S/∂s 界
+    // 双线性 ∂S/∂s=(1-t)(P10−P00)+t(P11−P01)；界 = (P10−P00),(P11−P01) 凸包
+    P3 A{ S.C[1].x-S.C[0].x, S.C[1].y-S.C[0].y, S.C[1].z-S.C[0].z },
+       B{ S.C[3].x-S.C[2].x, S.C[3].y-S.C[2].y, S.C[3].z-S.C[2].z };
+    return { { std::min(A.x,B.x), std::max(A.x,B.x) }, { std::min(A.y,B.y), std::max(A.y,B.y) }, { std::min(A.z,B.z), std::max(A.z,B.z) } };
+}
+static Int3 derivTRange(const nurbs::NurbsSurface& S) { // ∂S/∂t 界
+    P3 C{ S.C[2].x-S.C[0].x, S.C[2].y-S.C[0].y, S.C[2].z-S.C[0].z },
+       D{ S.C[3].x-S.C[1].x, S.C[3].y-S.C[1].y, S.C[3].z-S.C[1].z };
+    return { { std::min(C.x,D.x), std::max(C.x,D.x) }, { std::min(C.y,D.y), std::max(C.y,D.y) }, { std::min(C.z,D.z), std::max(C.z,D.z) } };
+}
+
+// 平面双线性 patch 构造（统一 NurbsSurface，P00→C[0], P10→C[1], P01→C[2], P11→C[3]）
+static nurbs::NurbsSurface makePatch(P3 p00, P3 p10, P3 p01, P3 p11) {
+    SurfacePoint cp4[4] = { p00, p10, p01, p11 };
+    return nurbs::NurbsSurface::makeBilinear(cp4);
+}
 
 // ---------- 3×3 实矩阵逆 ----------
 static bool inv3(const double M[3][3], double R[3][3]) {
@@ -100,16 +93,16 @@ static bool inv3(const double M[3][3], double R[3][3]) {
 }
 
 // 方系统 3D 曲线-曲面求交 Krawczyk：返回 1=证明存在唯一交点，0=未定/不存在
-static int proveCS(const Bezier3& C, const Patch& S, I3& ub, I3& sb, I3& tb) {
+static int proveCS(const Bezier3& C, const nurbs::NurbsSurface& S, I3& ub, I3& sb, I3& tb) {
     const double mu = ub.mid(), ms = sb.mid(), mt = tb.mid();
     const P3 cp = C.eval(mu), sp = S.eval(ms, mt);
     const double f[3] = { cp.x - sp.x, cp.y - sp.y, cp.z - sp.z };
-    const P3 cd = C.deriv(mu), ss = S.derivS(ms, mt), st = S.derivT(ms, mt);
+    const P3 cd = C.deriv(mu), ss = S.du(ms, mt), st = S.dv(ms, mt);
     const double Jm[3][3] = { { cd.x, -ss.x, -st.x }, { cd.y, -ss.y, -st.y }, { cd.z, -ss.z, -st.z } };
     double Ji[3][3];
     if (!inv3(Jm, Ji)) return 0;   // 中点 Jacobian 奇异 → 相切/退化，不证
     // J([x]) 3×3 区间
-    const Int3 ca = C.derivRange(), sa = S.derivSRange(), ta = S.derivTRange();
+    const Int3 ca = C.derivRange(), sa = derivSRange(S), ta = derivTRange(S);
     const I3 Jint[3][3] = { { ca.x, imul(sa.x, I3(-1,-1)), imul(ta.x, I3(-1,-1)) },
                             { ca.y, imul(sa.y, I3(-1,-1)), imul(ta.y, I3(-1,-1)) },
                             { ca.z, imul(sa.z, I3(-1,-1)), imul(ta.z, I3(-1,-1)) } };
@@ -131,7 +124,7 @@ static int proveCS(const Bezier3& C, const Patch& S, I3& ub, I3& sb, I3& tb) {
     return 1;
 }
 
-static void run(const char* label, const Bezier3& C, const Patch& S,
+static void run(const char* label, const Bezier3& C, const nurbs::NurbsSurface& S,
                 double u0, double s0, double t0, double delta, int expect) {
     I3 ub(u0 - delta, u0 + delta), sb(s0 - delta, s0 + delta), tb(t0 - delta, t0 + delta);
     int r = proveCS(C, S, ub, sb, tb);
@@ -140,10 +133,10 @@ static void run(const char* label, const Bezier3& C, const Patch& S,
 }
 
 int main() {
-    printf("==== 扩展：3D 曲线-曲面求交（方系统 R³→R³，Krawczyk 证明）====\n\n");
+    printf("==== 扩展：3D 曲线-曲面求交（方系统 R³→R³，Krawczyk 证明，统一 NurbsSurface）====\n\n");
 
     // 曲面：xz 平面 y=0 的双线性 patch（s∈x∈[-0.5,0.5]，t∈z∈[0,0.5]）
-    Patch S; S.P00 = { -0.5, 0, 0 }; S.P10 = { 0.5, 0, 0 }; S.P01 = { -0.5, 0, 0.5 }; S.P11 = { 0.5, 0, 0.5 };
+    nurbs::NurbsSurface S = makePatch({ -0.5, 0, 0 }, { 0.5, 0, 0 }, { -0.5, 0, 0.5 }, { 0.5, 0, 0.5 });
 
     // 场景 1：曲线穿过曲面（横截交点），C(u)=(0, u-0.5, 0.25)，交点 (u,s,t)=(0.5,0.5,0.5)
     {
@@ -154,7 +147,6 @@ int main() {
     // 场景 2：曲线顶点与曲面相切（仅接触一点，C'(0.5)=0 → 奇异）→ 不误证
     {
         printf("[2] 曲线与曲面相切（不误证）\n");
-        // C(u)=(0, (u-0.5)², 0.25)：二次 Bezier，y 控制点 0.25,-0.25,0.25 → 顶点 y=0 at u=0.5
         Bezier3 C; C.P = { {0,0.25,0.25}, {0,-0.25,0.25}, {0,0.25,0.25} };
         run("曲线顶点切面", C, S, 0.5, 0.5, 0.5, 1e-2, 0);
         run("曲线顶点切面(细盒)", C, S, 0.5, 0.5, 0.5, 1e-4, 0);
@@ -172,5 +164,6 @@ int main() {
         run("曲线在面内", C, S, 0.5, 0.5, 0.5, 1e-2, 0);   // 重叠非孤立解 → 不证
     }
     printf("\n结论：曲线-曲面求交（方系统 R³→R³）由 3×3 Krawczyk 保证；横截证明、相切/退化重叠/非交不误证。\n");
+    printf("      曲面表示统一为 nurbs::NurbsSurface（双线性 makeBilinear）。\n");
     return 0;
 }

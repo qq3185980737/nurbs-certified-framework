@@ -1,28 +1,27 @@
 // ============================================================================
-// bench_surf_w_degenerate.cpp — 曲面权重退化 + 退化-退化组合（路径A③）
+// bench_surf_w_degenerate.cpp — 曲面权重退化 + 退化-退化组合（路径A③，迁移到统一 NurbsSurface）
 //   在退化曲面求解恢复（点包含 R→R³/R²→R³、降维 R²→R³）之上，补齐：
 //   [0] 曲面退化检测扩展：退化点/共线/有理 w→0/w→∞/正则（有理 patch 带权重）。
 //   [1] 退化-退化组合①：退化点 patch × 退化点 patch（点重合证明/拒绝）。
-//   [2] 退化-退化组合②：退化点 patch × 退化到曲线 patch（降维 点 ∈ 3D线段）。
+//   [2] 退化-退化组合②：退化点 patch × 退化到曲线 patch（降维 点 in 3D线段）。
 //   [3] 退化-退化组合③：退化到曲线 patch × 退化到曲线 patch（3D 线段-线段相交）。
+//   曲面统一存储结构：nurbs/NurbsSurface（控制点 + 权重 w 字段）。
 //   自包含。
 // ============================================================================
 #include <cstdio>
 #include <cmath>
 #include <algorithm>
 #include <chrono>
+#include "nurbs/nurbs_surface.hpp"
 
-struct P3 { double x, y, z; };
+using P3 = nurbs::SurfacePoint;
+using SurfacePoint = nurbs::SurfacePoint;
 struct I3 { double lo, hi; I3(double l=0,double h=0):lo(l),hi(h){} double mid()const{return 0.5*(lo+hi);} };
 inline I3 iadd(const I3& a, const I3& b) { return { a.lo + b.lo, a.hi + b.hi }; }
 inline I3 isub(const I3& a, const I3& b) { return { a.lo - b.hi, a.hi - b.lo }; }
 inline I3 imul(const I3& a, const I3& b) { const double m1=a.lo*b.lo,m2=a.lo*b.hi,m3=a.hi*b.lo,m4=a.hi*b.hi; return { std::min(std::min(m1,m2),std::min(m3,m4)), std::max(std::max(m1,m2),std::max(m3,m4)) }; }
 
 struct C3 { P3 A, B; P3 eval(double u) const { return { A.x+u*(B.x-A.x), A.y+u*(B.y-A.y), A.z+u*(B.z-A.z) }; } P3 d() const { return { B.x-A.x, B.y-A.y, B.z-A.z }; } };
-struct Patch { P3 P00, P10, P01, P11;
-    P3 eval(double s, double t) const { const double w0=(1-s)*(1-t),w1=s*(1-t),w2=(1-s)*t,w3=s*t;
-        return { w0*P00.x+w1*P10.x+w2*P01.x+w3*P11.x, w0*P00.y+w1*P10.y+w2*P01.y+w3*P11.y, w0*P00.z+w1*P10.z+w2*P01.z+w3*P11.z }; }
-};
 
 // ---------- 退化-退化组合证明原语（复用对齐曲线侧的广义 Krawczyk） ----------
 static bool provePointOnCurve3D(const C3& C, const P3& P, double& lo, double& hi, int depth) {
@@ -35,7 +34,7 @@ static bool provePointOnCurve3D(const C3& C, const P3& P, double& lo, double& hi
     const double G = cd.x*cd.x + cd.y*cd.y + cd.z*cd.z;
     if (G < 1e-22) { double lm=0.5*(lo+m), rm=0.5*(m+hi); return provePointOnCurve3D(C,P,lo,m,depth+1)||provePointOnCurve3D(C,P,m,hi,depth+1); }
     const double A0=cd.x/G, A1=cd.y/G, A2=cd.z/G;
-    I3 Jx(cd.x,cd.x), Jy(cd.y,cd.y), Jz(cd.z,cd.z);   // 直线导数常数 → 点区间
+    I3 Jx(cd.x,cd.x), Jy(cd.y,cd.y), Jz(cd.z,cd.z);
     I3 M = isub(I3(1,1), iadd(iadd(imul(I3(A0,A0),Jx), imul(I3(A1,A1),Jy)), imul(I3(A2,A2),Jz)));
     const double jf = A0*g0 + A1*g1 + A2*g2;
     I3 K = iadd(I3(m-jf, m-jf), imul(M, I3(-w,w)));
@@ -79,29 +78,30 @@ static bool proveCurveCurve3D(const C3& L, const C3& C2, double& ulo,double& uhi
     return proveCurveCurve3D(L,C2,ulo,mu,vlo,mv,depth+1)||proveCurveCurve3D(L,C2,mu,uhi,vlo,mv,depth+1)||proveCurveCurve3D(L,C2,ulo,mu,mv,vhi,depth+1)||proveCurveCurve3D(L,C2,mu,uhi,mv,vhi,depth+1);
 }
 
-// ---------- 曲面退化检测扩展（有理 patch 带权重，含 w 退化） ----------
+// ---------- 统一 NurbsSurface 构造器（含权重） ----------
 struct WCP { double x, y, z, w; };
-struct WPatch { WCP P00, P10, P01, P11;
-    double wmin() const { return std::min(std::min(P00.w, P10.w), std::min(P01.w, P11.w)); }
-    double wmax() const { return std::max(std::max(P00.w, P10.w), std::max(P01.w, P11.w)); }
-    P3 eval(double s, double t) const {
-        const double w0=(1-s)*(1-t)*P00.w, w1=s*(1-t)*P10.w, w2=(1-s)*t*P01.w, w3=s*t*P11.w, D=w0+w1+w2+w3;
-        const double nx = w0*P00.x + w1*P10.x + w2*P01.x + w3*P11.x;
-        const double ny = w0*P00.y + w1*P10.y + w2*P01.y + w3*P11.y;
-        const double nz = w0*P00.z + w1*P10.z + w2*P01.z + w3*P11.z;
-        return { nx/D, ny/D, nz/D };
-    }
-};
+static nurbs::NurbsSurface makeBilinear2(double p00x,double p00y,double p00z, double p10x,double p10y,double p10z, double p01x,double p01y,double p01z, double p11x,double p11y,double p11z) {
+    SurfacePoint cp4[4] = { {p00x,p00y,p00z}, {p10x,p10y,p10z}, {p01x,p01y,p01z}, {p11x,p11y,p11z} };
+    return nurbs::NurbsSurface::makeBilinear(cp4);
+}
+// 有理双线性（带权重，权重存入 NurbsSurface.w）
+static nurbs::NurbsSurface makeRational(WCP a, WCP b, WCP c, WCP d) {
+    nurbs::NurbsSurface s; s.nu=2; s.nv=2; s.pu=1; s.pv=1;
+    s.uKnots={0,0,1,1}; s.vKnots={0,0,1,1};
+    s.C = { {a.x,a.y,a.z}, {b.x,b.y,b.z}, {c.x,c.y,c.z}, {d.x,d.y,d.z} };
+    s.w = { a.w, b.w, c.w, d.w };
+    return s;
+}
+
+// ---------- 曲面退化检测扩展（统一 NurbsSurface：几何角点 + 权重） ----------
 enum SurfDeg { SD_NONE, SD_POINT, SD_COLLINEAR, SD_RATIONAL };
-static SurfDeg detectSurfaceDegeneracy(const WPatch& W) {
-    const double wmin = W.wmin();
+static SurfDeg detectSurfaceDegeneracy(const nurbs::NurbsSurface& W) {
+    double wmin=1e300; for (int i=0;i<4;++i) wmin=std::min(wmin,W.w[i]);
     if (wmin < 1e-6) return SD_RATIONAL;
-    // 投影角点（几何）判定点/共线
-    const P3 q[4] = { {W.P00.x,W.P00.y,W.P00.z},{W.P10.x,W.P10.y,W.P10.z},{W.P01.x,W.P01.y,W.P01.z},{W.P11.x,W.P11.y,W.P11.z} };
+    const P3 q[4] = { W.C[0], W.C[1], W.C[2], W.C[3] };
     double minx=1e300,maxx=-1e300,miny=1e300,maxy=-1e300,minz=1e300,maxz=-1e300;
     for (int i=0;i<4;++i){ minx=std::min(minx,q[i].x);maxx=std::max(maxx,q[i].x);miny=std::min(miny,q[i].y);maxy=std::max(maxy,q[i].y);minz=std::min(minz,q[i].z);maxz=std::max(maxz,q[i].z); }
     if ((maxx-minx)<1e-12 && (maxy-miny)<1e-12 && (maxz-minz)<1e-12) return SD_POINT;
-    // 共线检测：以 q0 为原点，所有点叉积近似 0
     double dx=q[1].x-q[0].x, dy=q[1].y-q[0].y, dz=q[1].z-q[0].z;
     double len=std::sqrt(dx*dx+dy*dy+dz*dz);
     if (len<1e-12) { dx=q[2].x-q[0].x;dy=q[2].y-q[0].y;dz=q[2].z-q[0].z;len=std::sqrt(dx*dx+dy*dy+dz*dz); }
@@ -118,26 +118,22 @@ static SurfDeg detectSurfaceDegeneracy(const WPatch& W) {
 
 static uint32_t seed = 20261013u;
 static double rnd() { seed = seed * 1664525u + 1013904223u; return (seed >> 8) / 16777216.0; }
-static Patch degPointPatch(const P3& Q) { return Patch{ Q,Q,Q,Q }; }
-static Patch degLinePatch(const C3& L) {   // 四角点共线 → 退化为线段
-    return Patch{ L.eval(0.0), L.eval(0.6), L.eval(0.3), L.eval(1.0) };
-}
 
 int main() {
-    printf("==== 曲面权重退化 + 退化-退化组合（路径A③）====\n\n");
+    printf("==== 曲面权重退化 + 退化-退化组合（路径A③，统一 NurbsSurface）====\n\n");
 
     // [0] 曲面退化检测扩展（含 w）
     {
         printf("[0] 曲面退化检测扩展（有理权重）\n");
-        WPatch degPoint{ {0.5,0.3,0,1},{0.5,0.3,0,1},{0.5,0.3,0,1},{0.5,0.3,0,1} };
+        nurbs::NurbsSurface degPoint = makeRational({0.5,0.3,0,1},{0.5,0.3,0,1},{0.5,0.3,0,1},{0.5,0.3,0,1});
         printf("   退化点 patch → %s\n", detectSurfaceDegeneracy(degPoint)==SD_POINT?"POINT ✓":"✗");
-        WPatch degLine{ {0,0,0,1},{1,0.5,0,1},{0.3,0.15,0,1},{1.2,0.6,0,1} };
+        nurbs::NurbsSurface degLine = makeRational({0,0,0,1},{1,0.5,0,1},{0.3,0.15,0,1},{1.2,0.6,0,1});
         printf("   共线 patch → %s\n", detectSurfaceDegeneracy(degLine)==SD_COLLINEAR?"COLLINEAR ✓":"✗");
-        WPatch ratW{ {0,0,0,1e-9},{1,0,0,1},{0,1,0,1e-9},{1,1,0,1} };
+        nurbs::NurbsSurface ratW = makeRational({0,0,0,1e-9},{1,0,0,1},{0,1,0,1e-9},{1,1,0,1});
         printf("   有理 w→0 patch → %s\n", detectSurfaceDegeneracy(ratW)==SD_RATIONAL?"RATIONAL ✓":"✗");
-        WPatch hiW{ {0,0,0,1e6},{1,0,0,1e6},{0,1,0,1e6},{1,1,0,1e6} };
+        nurbs::NurbsSurface hiW = makeRational({0,0,0,1e6},{1,0,0,1e6},{0,1,0,1e6},{1,1,0,1e6});
         printf("   正则 w→∞(高权重) → %s（权重极限：控制点正则、无塌缩）\n", detectSurfaceDegeneracy(hiW)==SD_NONE?"NONE ✓":"✗");
-        WPatch reg{ {0,0,0,1},{1,0,0.4,1},{0,1,0.3,1},{1,1,0.7,1} };
+        nurbs::NurbsSurface reg = makeRational({0,0,0,1},{1,0,0.4,1},{0,1,0.3,1},{1,1,0.7,1});
         printf("   正则 patch → %s\n", detectSurfaceDegeneracy(reg)==SD_NONE?"NONE ✓":"✗");
     }
 
@@ -155,17 +151,17 @@ int main() {
         printf("\n[1] 退化点 patch × 退化点 patch：重合 500 → 判交 %lld (%.1f%%)；不重合 500 → 误交 %lld；总 %.1f ms，平均 %.2f us/例\n", hit, 100.0*hit/500, miss, us/1000.0, us/1000);
     }
 
-    // [2] 退化点 patch × 退化到曲线 patch（点 ∈ 3D 线段）
+    // [2] 退化点 patch × 退化到曲线 patch（点 in 3D 线段）
     {
         long long prov=0, tot=0;
         auto t2=std::chrono::high_resolution_clock::now();
         for (int i=0;i<500;++i){ P3 A{ rnd(),rnd(),rnd() }; C3 L{ A,{A.x+0.8,A.y+0.3,A.z+0.5} };
-            P3 Q = L.eval(0.2+0.5*rnd());   // 线段内点
+            P3 Q = L.eval(0.2+0.5*rnd());
             double lo=0,hi=1; if (provePointOnCurve3D(L,Q,lo,hi,0)) prov++; tot++; }
         long long hit=prov;
         prov=0; tot=0;
         for (int i=0;i<500;++i){ P3 A{ rnd(),rnd(),rnd() }; C3 L{ A,{A.x+0.8,A.y+0.3,A.z+0.5} };
-            P3 Q{ A.x+0.4, A.y-0.3, A.z+0.6 };   // 线段外点
+            P3 Q{ A.x+0.4, A.y-0.3, A.z+0.6 };
             double lo=0,hi=1; if (provePointOnCurve3D(L,Q,lo,hi,0)) prov++; tot++; }
         long long miss=prov;
         auto t3=std::chrono::high_resolution_clock::now();
@@ -178,15 +174,15 @@ int main() {
         long long prov=0, tot=0;
         auto t4=std::chrono::high_resolution_clock::now();
         for (int i=0;i<500;++i){ P3 A{ rnd(),rnd(),rnd() }; P3 B{ A.x+0.7,A.y+0.2,A.z+0.1 };
-            C3 L1{A,B}; P3 mid=L1.eval(0.4+0.2*rnd());   // 线段1内点，线段2穿过
-            P3 dir{ rnd()-0.5, rnd()-0.5, 0.7 };         // 与 L1 不平行
+            C3 L1{A,B}; P3 mid=L1.eval(0.4+0.2*rnd());
+            P3 dir{ rnd()-0.5, rnd()-0.5, 0.7 };
             P3 C{ mid.x-0.3*dir.x, mid.y-0.3*dir.y, mid.z-0.3*dir.z };
             C3 L2{ C, {C.x+0.6*dir.x, C.y+0.6*dir.y, C.z+0.6*dir.z} };
             double u0=0,u1=1,v0=0,v1=1; if (proveCurveCurve3D(L1,L2,u0,u1,v0,v1,0)) prov++; tot++; }
         long long hit=prov;
         prov=0; tot=0;
         for (int i=0;i<500;++i){ P3 A{ rnd(),rnd(),rnd() }; P3 B{ A.x+0.7,A.y+0.2,A.z+0.1 };
-            C3 L1{A,B}; C3 L2{ {A.x+0.2,A.y-0.5,A.z},{A.x+0.9,A.y-0.5,A.z} };   // 平行偏移，分离
+            C3 L1{A,B}; C3 L2{ {A.x+0.2,A.y-0.5,A.z},{A.x+0.9,A.y-0.5,A.z} };
             double u0=0,u1=1,v0=0,v1=1; if (proveCurveCurve3D(L1,L2,u0,u1,v0,v1,0)) prov++; tot++; }
         long long miss=prov;
         auto t5=std::chrono::high_resolution_clock::now();
@@ -195,6 +191,6 @@ int main() {
     }
 
     printf("\n结论：曲面 w 退化检测（RATIONAL/高权重）与退化-退化组合（点-点/点-线/线-线）\n");
-    printf("      求解/证明闭环已补齐，正则不回归、未命中零误证。\n");
+    printf("      求解/证明闭环已补齐，正则不回归、未命中零误证。曲面统一为 nurbs::NurbsSurface。\n");
     return 0;
 }

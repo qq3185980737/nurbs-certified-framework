@@ -1,20 +1,24 @@
 // ============================================================================
-// bench_surface_selfintersection.cpp — 曲面自交检测（路径D①）
+// bench_surface_selfintersection.cpp — 曲面自交检测（路径D①，迁移到统一 NurbsSurface）
 //   自交 = 存在参数 (s1,t1)≠(s2,t2) 使 S(s1,t1)=S(s2,t2)。
-//   检测层（保证性判据）：法向退化（ds×dt 包围盒含 0 向量）是自交的必要条件，
+//   检测层（保证性判据）：法向退化（du×dv 包围盒含 0 向量）是自交的必要条件，
 //     法向不退化 ⇒ 无折叠型自交（可保证地"排除"，不误报）。
 //   证明层：对折叠（法向退化）patch，用对称折叠构造自交点：
 //     S(s1,t0)=S(s2,t0)（s1≠s2），把 P=S(s1,t0) 当作待证点、C(t)=S(s2,t)
 //     当作 3D 曲线，用 provePointOnCurve3D（点 ∈ 3D 曲线，超定 R→R³ 广义
 //     Krawczyk）证明存在 t' 使 S(s2,t')=P → 自交存在性证明。
-//   自包含。
+//   曲面统一存储结构：nurbs/NurbsSurface（控制点网格 + u/v knots + 阶数 + 权重，
+//     张量积 de Boor 求值 / du / dv）。
 // ============================================================================
 #include <cstdio>
 #include <cmath>
 #include <algorithm>
 #include <chrono>
+#include "nurbs/nurbs_surface.hpp"
 
-struct P3 { double x, y, z; };
+using P3 = nurbs::SurfacePoint;
+using SurfacePoint = nurbs::SurfacePoint;
+
 struct I3 { double lo, hi; I3(double l=0,double h=0):lo(l),hi(h){} double mid()const{return 0.5*(lo+hi);} };
 inline I3 iadd(const I3& a, const I3& b) { return { a.lo + b.lo, a.hi + b.hi }; }
 inline I3 isub(const I3& a, const I3& b) { return { a.lo - b.hi, a.hi - b.lo }; }
@@ -44,54 +48,14 @@ static bool provePointOnCurve3D(const C3& C, const P3& P, double& lo, double& hi
     return provePointOnCurve3D(C,P,lo,m,depth+1)||provePointOnCurve3D(C,P,m,hi,depth+1);
 }
 
-// ---------- 双二次 Bezier patch（3×3 控制点） ----------
-struct BiqPatch {
-    P3 C[3][3];
-    double B[3][3];               // 二阶 Bernstein：u² v² 系数（权重=1，无理）
-    double W[3][3];
-    P3 eval(double s, double t) const {
-        double ws[3]={ (1-s)*(1-s), 2*s*(1-s), s*s }, wt[3]={ (1-t)*(1-t), 2*t*(1-t), t*t };
-        P3 p{0,0,0};
-        for (int i=0;i<3;++i) for (int j=0;j<3;++j) {
-            const double b = ws[i]*wt[j];
-            p.x += b*C[i][j].x; p.y += b*C[i][j].y; p.z += b*C[i][j].z;
-        }
-        return p;
-    }
-    P3 ds(double s, double t) const {
-        double wds[3]={ -2*(1-s), 2*(1-2*s), 2*s }, wt[3]={ (1-t)*(1-t), 2*t*(1-t), t*t };
-        P3 p{0,0,0};
-        for (int i=0;i<3;++i) for (int j=0;j<3;++j) {
-            const double b = wds[i]*wt[j];
-            p.x += b*C[i][j].x; p.y += b*C[i][j].y; p.z += b*C[i][j].z;
-        }
-        return p;
-    }
-    P3 dt(double s, double t) const {
-        double ws[3]={ (1-s)*(1-s), 2*s*(1-s), s*s }, wdt[3]={ -2*(1-t), 2*(1-2*t), 2*t };
-        P3 p{0,0,0};
-        for (int i=0;i<3;++i) for (int j=0;j<3;++j) {
-            const double b = ws[i]*wdt[j];
-            p.x += b*C[i][j].x; p.y += b*C[i][j].y; p.z += b*C[i][j].z;
-        }
-        return p;
-    }
-    // 法向叉积 ds×dt 的 y 分量（用于折叠判据；一般取包围盒判据）
-    double normalY(double s, double t) const {
-        P3 a=ds(s,t), b=dt(s,t);
-        // 叉积 (a×b).y = a.z*b.x - a.x*b.z
-        return a.z*b.x - a.x*b.z;
-    }
-};
-
-// ---------- 检测层：法向退化（折叠）判据 ----------
-// 对 3×3 网格采样 ds×dt，若法向包围盒含原点（三分量同时包 0）→ 存在法向零点
+// ---------- 检测层：法向退化（折叠）判据（统一 NurbsSurface） ----------
+// 对 3×3 网格采样 du×dv，若法向包围盒含原点（三分量同时包 0）→ 存在法向零点
 // ⇒ 折叠候选（自交必要条件）。法向恒非零 ⇒ 无折叠型自交（不误报）。
-static bool detectFold(const BiqPatch& S) {
+static bool detectFold(const nurbs::NurbsSurface& S) {
     double minx=1e300,maxx=-1e300,miny=1e300,maxy=-1e300,minz=1e300,maxz=-1e300;
     for (int i=0;i<=2;++i) for (int j=0;j<=2;++j) {
         const double s=0.5*i, t=0.5*j;
-        const P3 a=S.ds(s,t), b=S.dt(s,t);
+        const P3 a=S.du(s,t), b=S.dv(s,t);
         const double cx=a.y*b.z-a.z*b.y, cy=a.z*b.x-a.x*b.z, cz=a.x*b.y-a.y*b.x;
         minx=std::min(minx,cx);maxx=std::max(maxx,cx);
         miny=std::min(miny,cy);maxy=std::max(maxy,cy);
@@ -102,7 +66,7 @@ static bool detectFold(const BiqPatch& S) {
 }
 
 // 自交存在性证明：P=S(s1,t0) 是否在曲线 C(t)=S(s2,t) 上（s1≠s2 → 自交）
-static bool proveSelfIntersection(const BiqPatch& S, double s1, double s2, double t0) {
+static bool proveSelfIntersection(const nurbs::NurbsSurface& S, double s1, double s2, double t0) {
     // C(t)=S(s2,t)：s2 固定时是 3D 曲线。构造其两端直线（若 x 常数则正是直线）
     const P3 ca=S.eval(s2,0), cb=S.eval(s2,1);
     C3 C{ca,cb};
@@ -111,43 +75,41 @@ static bool proveSelfIntersection(const BiqPatch& S, double s1, double s2, doubl
     return provePointOnCurve3D(C,P,lo,hi,0);
 }
 
-// ---------- 构造器 ----------
+// ---------- 构造器（统一 NurbsSurface） ----------
 static uint32_t seed = 20261014u;
 static double rnd() { seed = seed * 1664525u + 1013904223u; return (seed >> 8) / 16777216.0; }
 
 // 对称折叠 patch：S=(A*s(1-s)+x0, 0, B*t+z0) → S(s,t)=S(1-s,t)（沿 s=0.5 折叠自交）
-static BiqPatch foldPatch(double A, double x0, double B, double z0) {
-    BiqPatch S{};
-    // 构造 x(s)=A*s(1-s)+x0, z(t)=B*t+z0, y=0
+static nurbs::NurbsSurface foldPatch(double A, double x0, double B, double z0) {
+    SurfacePoint cp[9];
     for (int i=0;i<3;++i) for (int j=0;j<3;++j) {
         const double s = 0.5*i;                    // 控制点 i 处 s 值（Bernstein 系数）
         const double t = 0.5*j;
         const double xs = A * s * (1-s) + x0;      // 控制点 x（Bezier 端/中）
-        // 注意：Bezier 控制点值 = 该控制点的多项式值
-        S.C[i][j] = { xs, 0, B * t + z0 };
+        cp[j*3+i] = { xs, 0, B * t + z0 };          // 行优先：j=v 行 / i=u 列
     }
-    return S;
+    return nurbs::NurbsSurface::makeBezierBiquadratic(cp);
 }
 // 正则（单值图）patch：S=(A*s+x0, 0, B*t+z0) → 法向恒定，无折叠
-static BiqPatch regPatch(double A, double x0, double B, double z0) {
-    BiqPatch S{};
+static nurbs::NurbsSurface regPatch(double A, double x0, double B, double z0) {
+    SurfacePoint cp[9];
     for (int i=0;i<3;++i) for (int j=0;j<3;++j) {
         const double s = 0.5*i, t = 0.5*j;
-        S.C[i][j] = { A*s+x0, 0, B*t+z0 };
+        cp[j*3+i] = { A*s+x0, 0, B*t+z0 };
     }
-    return S;
+    return nurbs::NurbsSurface::makeBezierBiquadratic(cp);
 }
 
 int main() {
-    printf("==== 曲面自交检测（路径D①：法向退化判据 + 对称折叠证明）====\n\n");
+    printf("==== 曲面自交检测（路径D①：法向退化判据 + 对称折叠证明，统一 NurbsSurface）====\n\n");
 
     // [0] 单例：折叠 vs 正则
     {
-        BiqPatch fold = foldPatch(1.0, 0.0, 1.0, 0.0);
+        nurbs::NurbsSurface fold = foldPatch(1.0, 0.0, 1.0, 0.0);
         printf("[0] 折叠双二次 S=(s(1-s),0,t): detectFold=%s\n", detectFold(fold)?"FOLD(自交候选) ✓":"REGULAR ✗");
         bool si = proveSelfIntersection(fold, 0.25, 0.75, 0.5);
         printf("   自交存在性证明 (P=S(0.25,0.5)∈曲线S(0.75,t)): %s\n", si?"证明 ✓ (S(0.25,0.5)=S(0.75,0.5))":"未证明 ✗");
-        BiqPatch reg = regPatch(1.0, 0.0, 1.0, 0.0);
+        nurbs::NurbsSurface reg = regPatch(1.0, 0.0, 1.0, 0.0);
         printf("   正则双二次 S=(s,0,t): detectFold=%s（法向不退化 ⇒ 无折叠型自交）\n", detectFold(reg)?"FOLD ✗(误报)":"REGULAR ✓");
     }
 
@@ -157,7 +119,7 @@ int main() {
         auto t0=std::chrono::high_resolution_clock::now();
         for (int i=0;i<500;++i) {
             double A=0.3+0.7*rnd(), x0=-0.3+rnd(), B=0.3+0.7*rnd(), z0=-0.3+rnd();
-            BiqPatch f = foldPatch(A,x0,B,z0);
+            nurbs::NurbsSurface f = foldPatch(A,x0,B,z0);
             if (detectFold(f)) foldD++;
             if (proveSelfIntersection(f, 0.25, 0.75, 0.3+0.4*rnd())) foldP++;
         }
@@ -172,7 +134,7 @@ int main() {
         long long regOK=0;
         for (int i=0;i<500;++i) {
             double A=0.3+0.7*rnd(), x0=-0.3+rnd(), B=0.3+0.7*rnd(), z0=-0.3+rnd();
-            BiqPatch r = regPatch(A,x0,B,z0);
+            nurbs::NurbsSurface r = regPatch(A,x0,B,z0);
             if (!detectFold(r)) regOK++;
         }
         printf("[2] 随机正则 patch × 500：detectFold 无误报（REGULAR）%lld (%.1f%%)\n", regOK, 100.0*regOK/500);
@@ -180,5 +142,6 @@ int main() {
 
     printf("\n结论：曲面自交检测——法向退化判据对折叠 patch 命中、对正则单值图零误报；\n");
     printf("      对称折叠自交存在性由 3D 点包含（超定 R→R³ 广义 Krawczyk）证明，全部通过。\n");
+    printf("      曲面表示统一为 nurbs::NurbsSurface（控制点网格 + u/v knots + 阶数）。\n");
     return 0;
 }

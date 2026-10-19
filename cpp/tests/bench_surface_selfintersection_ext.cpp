@@ -1,20 +1,22 @@
 // ============================================================================
-// bench_surface_selfintersection_ext.cpp — 曲面自交检测·实验扩展（路径D①+）
-//   P2 论文扩展实验：把折叠检测与自交存在性证明推广到更具一般性的情形，
-//   提升 GMP 审稿说服力：
-//   [E0] 非对称折叠：对称轴 p 任意 ∈(0.25,0.75)，而非固定 s=0.5
-//        S=(x0+A·(s−p)², 0, B·t+z0) → 存在 s1≠s2 (s1+s2=2p) 使 S(s1,t)=S(s2,t)
-//   [E1] 非平面折叠：y(s)=y0+C·(s−p)² 使曲面非平面，但仍沿 s=p 折叠
-//   [E2] 非平面正则零误报：y(s)=y0+C·s²（弯曲但法向包围盒三分量不同时含0）
-//   [E3] 双三次 patch（4×4 控制点）：对称折叠 detectFold + 自交证明
+// bench_surface_selfintersection_ext.cpp — 曲面自交检测·实验扩展（路径D①+，迁移到统一 NurbsSurface）
+//   把折叠检测与自交存在性证明推广到更具一般性的情形：
+//   [E0] 非对称折叠：对称轴 p 任意 in (0.25,0.75)，S=(x0+A(s-p)^2, 0, Bt+z0)
+//        -> 存在 s1!=s2 (s1+s2=2p) 使 S(s1,t)=S(s2,t)
+//   [E1] 非平面折叠：y=y0+C(s-p)^2 使曲面非平面，但仍沿 s=p 折叠
+//   [E2] 非平面正则零误报：y=y0+C s^2（弯曲但法向包围盒三分量不同时含0）
+//   [E3] 双三次 patch（4x4 控制点）：对称折叠 detectFold + 自交证明
 //   每个 500 组：检测命中 + 自交存在证明；正则零误报。
+//   曲面统一存储结构：nurbs/NurbsSurface（双二次 makeBezierBiquadratic / 双三次手动构造）。
 // 自包含。
 // ============================================================================
 #include <cstdio>
 #include <cmath>
 #include <algorithm>
+#include "nurbs/nurbs_surface.hpp"
 
-struct P3 { double x, y, z; };
+using P3 = nurbs::SurfacePoint;
+using SurfacePoint = nurbs::SurfacePoint;
 struct I3 { double lo, hi; I3(double l=0,double h=0):lo(l),hi(h){} double mid()const{return 0.5*(lo+hi);} };
 inline I3 iadd(const I3& a, const I3& b) { return { a.lo + b.lo, a.hi + b.hi }; }
 inline I3 isub(const I3& a, const I3& b) { return { a.lo - b.hi, a.hi - b.lo }; }
@@ -44,82 +46,44 @@ static bool provePointOnCurve3D(const C3& C, const P3& P, double& lo, double& hi
     return provePointOnCurve3D(C,P,lo,m,depth+1)||provePointOnCurve3D(C,P,m,hi,depth+1);
 }
 
-// ---------- 双二次 patch（3×3 控制点） ----------
-struct BiqPatch {
-    P3 C[3][3];
-    P3 eval(double s, double t) const {
-        double ws[3]={ (1-s)*(1-s), 2*s*(1-s), s*s }, wt[3]={ (1-t)*(1-t), 2*t*(1-t), t*t };
-        P3 p{0,0,0};
-        for (int i=0;i<3;++i) for (int j=0;j<3;++j) { const double b=ws[i]*wt[j];
-            p.x += b*C[i][j].x; p.y += b*C[i][j].y; p.z += b*C[i][j].z; }
-        return p;
+// ---------- 统一 NurbsSurface 构造器 ----------
+// 3x3 双二次：x/y 由控制参数数组 cx/cy 给出，z 线性 B*t+z0
+static nurbs::NurbsSurface makeBiq(const double* cx, const double* cy, double B, double z0) {
+    SurfacePoint cp[9];
+    for (int a=0;a<3;++a) for (int b=0;b<3;++b) {
+        const double t=0.5*b;
+        cp[b*3+a] = { cx[a], cy[a], B*t+z0 };
     }
-    P3 ds(double s, double t) const {
-        double wds[3]={ -2*(1-s), 2*(1-2*s), 2*s }, wt[3]={ (1-t)*(1-t), 2*t*(1-t), t*t };
-        P3 p{0,0,0};
-        for (int i=0;i<3;++i) for (int j=0;j<3;++j) { const double b=wds[i]*wt[j];
-            p.x += b*C[i][j].x; p.y += b*C[i][j].y; p.z += b*C[i][j].z; }
-        return p;
+    return nurbs::NurbsSurface::makeBezierBiquadratic(cp);
+}
+// 4x4 双三次：x 由 xs[a] 给，y=0，z 线性 B*tt+z0（tt=b/3）
+static nurbs::NurbsSurface makeCub(const double* xs, double B, double z0) {
+    nurbs::NurbsSurface s; s.nu=4; s.nv=4; s.pu=3; s.pv=3;
+    s.uKnots={0,0,0,0,1,1,1,1}; s.vKnots={0,0,0,0,1,1,1,1};
+    s.C.resize(16); s.w.assign(16,1.0);
+    for (int a=0;a<4;++a) for (int b=0;b<4;++b) {
+        const double tt=(double)b/3.0;
+        s.C[b*4+a] = { xs[a], 0, B*tt+z0 };
     }
-    P3 dt(double s, double t) const {
-        double ws[3]={ (1-s)*(1-s), 2*s*(1-s), s*s }, wdt[3]={ -2*(1-t), 2*(1-2*t), 2*t };
-        P3 p{0,0,0};
-        for (int i=0;i<3;++i) for (int j=0;j<3;++j) { const double b=ws[i]*wdt[j];
-            p.x += b*C[i][j].x; p.y += b*C[i][j].y; p.z += b*C[i][j].z; }
-        return p;
-    }
-    P3 normal(double s, double t) const { P3 a=ds(s,t), b=dt(s,t);
-        return { a.y*b.z-a.z*b.y, a.z*b.x-a.x*b.z, a.x*b.y-a.y*b.x }; }
-};
+    return s;
+}
 
-// ---------- 双三次 patch（4×4 控制点） ----------
-struct CubPatch {
-    P3 C[4][4];
-    P3 eval(double s, double t) const {
-        double ws[4]={ (1-s)*(1-s)*(1-s), 3*s*(1-s)*(1-s), 3*s*s*(1-s), s*s*s };
-        double wt[4]={ (1-t)*(1-t)*(1-t), 3*t*(1-t)*(1-t), 3*t*t*(1-t), t*t*t };
-        P3 p{0,0,0};
-        for (int i=0;i<4;++i) for (int j=0;j<4;++j) { const double b=ws[i]*wt[j];
-            p.x += b*C[i][j].x; p.y += b*C[i][j].y; p.z += b*C[i][j].z; }
-        return p;
-    }
-    P3 ds(double s, double t) const {
-        double wds[4]={ -3*(1-s)*(1-s), 3*(1-s)*(1-3*s), 3*s*(2-3*s), 3*s*s };
-        double wt[4]={ (1-t)*(1-t)*(1-t), 3*t*(1-t)*(1-t), 3*t*t*(1-t), t*t*t };
-        P3 p{0,0,0};
-        for (int i=0;i<4;++i) for (int j=0;j<4;++j) { const double b=wds[i]*wt[j];
-            p.x += b*C[i][j].x; p.y += b*C[i][j].y; p.z += b*C[i][j].z; }
-        return p;
-    }
-    P3 dt(double s, double t) const {
-        double ws[4]={ (1-s)*(1-s)*(1-s), 3*s*(1-s)*(1-s), 3*s*s*(1-s), s*s*s };
-        double wdt[4]={ -3*(1-t)*(1-t), 3*(1-t)*(1-3*t), 3*t*(2-3*t), 3*t*t };
-        P3 p{0,0,0};
-        for (int i=0;i<4;++i) for (int j=0;j<4;++j) { const double b=ws[i]*wdt[j];
-            p.x += b*C[i][j].x; p.y += b*C[i][j].y; p.z += b*C[i][j].z; }
-        return p;
-    }
-    P3 normal(double s, double t) const { P3 a=ds(s,t), b=dt(s,t);
-        return { a.y*b.z-a.z*b.y, a.z*b.x-a.x*b.z, a.x*b.y-a.y*b.x }; }
-};
-
-// ---------- 法向包围盒含原点判据（3×3 采样） ----------
-template <class PATCH>
-static bool normalBoxDegenerate(const PATCH& S) {
+// ---------- 法向包围盒含原点判据（3×3 采样，统一 NurbsSurface） ----------
+static bool normalBoxDegenerate(const nurbs::NurbsSurface& S) {
     double minx=1e300,maxx=-1e300,miny=1e300,maxy=-1e300,minz=1e300,maxz=-1e300;
     for (int i=0;i<=2;++i) for (int j=0;j<=2;++j) {
         const double s=0.5*i, t=0.5*j;
-        const P3 n=S.normal(s,t);
-        minx=std::min(minx,n.x);maxx=std::max(maxx,n.x);
-        miny=std::min(miny,n.y);maxy=std::max(maxy,n.y);
-        minz=std::min(minz,n.z);maxz=std::max(maxz,n.z);
+        const P3 a=S.du(s,t), b=S.dv(s,t);
+        const double nx=a.y*b.z-a.z*b.y, ny=a.z*b.x-a.x*b.z, nz=a.x*b.y-a.y*b.x;
+        minx=std::min(minx,nx);maxx=std::max(maxx,nx);
+        miny=std::min(miny,ny);maxy=std::max(maxy,ny);
+        minz=std::min(minz,nz);maxz=std::max(maxz,nz);
     }
     return (minx<=0 && maxx>=0) && (miny<=0 && maxy>=0) && (minz<=0 && maxz>=0);
 }
 
-// ---------- 自交存在性证明：P=S(s1,t0) ∈ 曲线 C(t)=S(s2,t)，s1≠s2 ----------
-template <class PATCH>
-static bool proveSelfIntersection(const PATCH& S, double s1, double s2, double t0) {
+// ---------- 自交存在性证明：P=S(s1,t0) in 曲线 C(t)=S(s2,t)，s1!=s2 ----------
+static bool proveSelfIntersection(const nurbs::NurbsSurface& S, double s1, double s2, double t0) {
     const P3 ca=S.eval(s2,0), cb=S.eval(s2,1);
     C3 C{ca,cb};
     const P3 P=S.eval(s1,t0);
@@ -131,86 +95,71 @@ static uint32_t seed = 20261014u;
 static double rnd() { seed = seed * 1664525u + 1013904223u; return (seed >> 8) / 16777216.0; }
 
 int main() {
-    printf("==== 曲面自交检测·实验扩展（非对称折叠/非平面/双三次）====\n\n");
+    printf("==== 曲面自交检测·实验扩展（非对称折叠/非平面/双三次，统一 NurbsSurface）====\n\n");
 
-    // [E0] 非对称折叠：对称轴 p 任意 ∈(0.25,0.75)，x(s)=x0+A(s−p)², y=0
-    //     Bezier 控制点（二次）：c=[Ap², A(p²−p), A(1−p)²]（非节点值）
+    // [E0] 非对称折叠：对称轴 p 任意 in (0.25,0.75)，x=x0+A(s-p)^2, y=0
+    //     Bezier 控制点（二次）：cx=[Ap^2, A(p^2-p), A(1-p)^2]（非节点值）
     {
         long long foldD=0, foldP=0;
         for (int i=0;i<500;++i) {
             double p=0.25+0.5*rnd(), A=0.3+0.7*rnd(), x0=-0.3+rnd(), B=0.3+0.7*rnd(), z0=-0.3+rnd();
-            BiqPatch S{};
             const double cx[3] = { x0 + A*p*p, x0 + A*(p*p-p), x0 + A*(1-p)*(1-p) };
-            for (int a=0;a<3;++a) for (int b=0;b<3;++b) {
-                const double t=0.5*b;
-                S.C[a][b] = { cx[a], 0, B*t+z0 };
-            }
+            const double cy[3] = { 0, 0, 0 };
+            nurbs::NurbsSurface S = makeBiq(cx, cy, B, z0);
             if (normalBoxDegenerate(S)) foldD++;
-            double d=0.05+0.18*rnd(), s1=p-d, s2=p+d;   // 对称对，均在内域
+            double d=0.05+0.18*rnd(), s1=p-d, s2=p+d;
             if (proveSelfIntersection(S,s1,s2,0.3+0.4*rnd())) foldP++;
         }
-        printf("[E0] 非对称折叠（对称轴 p 任意）× 500：检测命中 %lld (%.1f%%)；自交证明 %lld (%.1f%%)\n",
+        printf("[E0] 非对称折叠（对称轴 p 任意）x 500：检测命中 %lld (%.1f%%)；自交证明 %lld (%.1f%%)\n",
                foldD, 100.0*foldD/500, foldP, 100.0*foldP/500);
     }
 
-    // [E1] 非平面折叠：y(s)=y0+C(s−p)²（曲面非平面，仍沿 s=p 折叠）
+    // [E1] 非平面折叠：y=y0+C(s-p)^2（曲面非平面，仍沿 s=p 折叠）
     {
         long long foldD=0, foldP=0;
         for (int i=0;i<500;++i) {
             double p=0.25+0.5*rnd(), A=0.3+0.7*rnd(), C=0.2+0.5*rnd();
             double x0=-0.3+rnd(), y0=-0.3+rnd(), B=0.3+0.7*rnd(), z0=-0.3+rnd();
-            BiqPatch S{};
             const double cx[3] = { x0 + A*p*p, x0 + A*(p*p-p), x0 + A*(1-p)*(1-p) };
             const double cy[3] = { y0 + C*p*p, y0 + C*(p*p-p), y0 + C*(1-p)*(1-p) };
-            for (int a=0;a<3;++a) for (int b=0;b<3;++b) {
-                const double t=0.5*b;
-                S.C[a][b] = { cx[a], cy[a], B*t+z0 };
-            }
+            nurbs::NurbsSurface S = makeBiq(cx, cy, B, z0);
             if (normalBoxDegenerate(S)) foldD++;
-            double d=0.05+0.18*rnd(), s1=p-d, s2=p+d;   // 对称对，均在内域
+            double d=0.05+0.18*rnd(), s1=p-d, s2=p+d;
             if (proveSelfIntersection(S,s1,s2,0.3+0.4*rnd())) foldP++;
         }
-        printf("[E1] 非平面折叠（y=C(s−p)²）× 500：检测命中 %lld (%.1f%%)；自交证明 %lld (%.1f%%)\n",
+        printf("[E1] 非平面折叠（y=C(s-p)^2）x 500：检测命中 %lld (%.1f%%)；自交证明 %lld (%.1f%%)\n",
                foldD, 100.0*foldD/500, foldP, 100.0*foldP/500);
     }
 
-    // [E2] 非平面正则零误报：y(s)=y0+C·s²（弯曲但法向包围盒三分量不同时含0）
+    // [E2] 非平面正则零误报：y=y0+C s^2（弯曲但法向包围盒三分量不同时含0）
     {
         long long regOK=0;
         for (int i=0;i<500;++i) {
             double A=0.3+0.7*rnd(), C=0.2+0.5*rnd();
             double x0=-0.3+rnd(), y0=-0.3+rnd(), B=0.3+0.7*rnd(), z0=-0.3+rnd();
-            BiqPatch S{};
-            for (int a=0;a<3;++a) for (int b=0;b<3;++b) {
-                const double s=0.5*a, t=0.5*b;
-                S.C[a][b] = { x0 + A*s, y0 + C*s*s, B*t+z0 };
-            }
+            const double cx[3] = { x0, x0 + 0.5*A, x0 + A };
+            const double cy[3] = { y0, y0 + 0.25*C, y0 + C };
+            nurbs::NurbsSurface S = makeBiq(cx, cy, B, z0);
             if (!normalBoxDegenerate(S)) regOK++;
         }
-        printf("[E2] 非平面正则（y=C·s²）× 500：零误报（REGULAR）%lld (%.1f%%)\n", regOK, 100.0*regOK/500);
+        printf("[E2] 非平面正则（y=C s^2）x 500：零误报（REGULAR）%lld (%.1f%%)\n", regOK, 100.0*regOK/500);
     }
 
-    // [E3] 双三次 patch：对称折叠 x=A·s(1−s)（控制点 [0,A/3,A/3,0]），y=0
+    // [E3] 双三次 patch：对称折叠 x=A s(1-s)（控制点 [x0,x0+A/3,x0+A/3,x0]），y=0
     {
         long long foldD=0, foldP=0;
         for (int i=0;i<500;++i) {
             double A=0.3+0.7*rnd(), x0=-0.3+rnd(), B=0.3+0.7*rnd(), z0=-0.3+rnd();
-            CubPatch S{};
-            // 三次 Bernstein：x(s)=x0+A·s(1−s) → 控制点 x = [x0, x0+A/3, x0+A/3, x0]
-            for (int a=0;a<4;++a) for (int b=0;b<4;++b) {
-                const double t=0.5*b/1.5;   // b=0..3 → t 采样
-                const double xs = (a==1||a==2) ? x0 + A/3.0 : x0;
-                const double tt = (double)b/3.0;
-                S.C[a][b] = { xs, 0, B*tt+z0 };
-            }
+            const double xs[4] = { x0, x0 + A/3.0, x0 + A/3.0, x0 };
+            nurbs::NurbsSurface S = makeCub(xs, B, z0);
             if (normalBoxDegenerate(S)) foldD++;
             if (proveSelfIntersection(S,0.25,0.75,0.3+0.4*rnd())) foldP++;
         }
-        printf("[E3] 双三次折叠 × 500：检测命中 %lld (%.1f%%)；自交证明 %lld (%.1f%%)\n",
+        printf("[E3] 双三次折叠 x 500：检测命中 %lld (%.1f%%)；自交证明 %lld (%.1f%%)\n",
                foldD, 100.0*foldD/500, foldP, 100.0*foldP/500);
     }
 
     printf("\n结论：实验扩展完成——非对称折叠（对称轴任意）、非平面折叠、双三次折叠均\n");
-    printf("      检测命中 + 自交存在证明；非平面正则零误报。\n");
+    printf("      检测命中 + 自交存在证明；非平面正则零误报。曲面统一为 nurbs::NurbsSurface。\n");
     return 0;
 }
