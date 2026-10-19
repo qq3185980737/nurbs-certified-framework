@@ -1598,6 +1598,13 @@ let curve1 = null;
                 const tolerance = parseFloat(document.getElementById('convergenceTolerance').value);
                 const usePreFiltering = document.getElementById('usePreFiltering').checked;
                 
+                // 输入校验：非法参数给出明确提示，避免静默 NaN 结果
+                const cfgErr = [];
+                if (Number.isNaN(gridSize) || gridSize < 1) cfgErr.push('网格密度需 ≥1');
+                if (Number.isNaN(maxIterations) || maxIterations < 1) cfgErr.push('最大迭代需 ≥1');
+                if (Number.isNaN(tolerance) || tolerance <= 0) cfgErr.push('容差需 >0');
+                if (cfgErr.length) { alert('参数无效：' + cfgErr.join('、') + '，请修正后重试'); return; }
+                
                 // 执行求解
                 currentResults = unifiedSolve(curve1, curve2, {
                     usePreFiltering,
@@ -1925,6 +1932,19 @@ let curve1 = null;
             updateCurves();
         }
         
+        // 清空全部结果指标（重置 / 切换场景时调用，避免旧结果残留与新状态矛盾）
+        function resetResultMetrics() {
+            ['resultU', 'resultV', 'resultDistance', 'resultResidual', 'resultIterations', 'resultTime', 'resultCondition']
+                .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '—'; });
+            const p1 = document.getElementById('resultPoint1'); if (p1) p1.value = '—';
+            const p2 = document.getElementById('resultPoint2'); if (p2) p2.value = '—';
+            const cnt = document.getElementById('resultCount'); if (cnt) cnt.textContent = '0';
+            const lst = document.getElementById('resultList'); if (lst) lst.innerHTML = '<div class="form-label" style="text-align:center;">无交点（分离 / 最近点）</div>';
+            const pr = document.getElementById('proofStatus'); if (pr) pr.textContent = 'Krawczyk 证明：—';
+            const msg = document.getElementById('geoMessage'); if (msg) msg.textContent = '-';
+            const logEl = document.getElementById('iterationLog'); if (logEl) logEl.innerHTML = '<div class="form-label" style="text-align: center;">暂无数据</div>';
+        }
+        
         function resetApplication() {
             initCurve1();
             initCurve2();
@@ -1932,9 +1952,7 @@ let curve1 = null;
             
             document.getElementById('geoStatus').className = 'status-badge status-undetermined';
             document.getElementById('geoStatus').textContent = '未计算';
-            document.getElementById('geoMessage').textContent = '-';
-            document.getElementById('iterationLog').innerHTML = 
-                '<div class="form-label" style="text-align: center;">暂无数据</div>';
+            resetResultMetrics();
             
             updateCurves();
             canvasEngine.fitCurves(curve1, curve2);
@@ -2137,10 +2155,11 @@ let curve1 = null;
             updateControlPointsUI('curve1');
             updateControlPointsUI('curve2');
             
-            // 重置结果
+            // 重置结果（含全部结果指标，避免旧场景结果残留）
             currentResults = [];
             document.getElementById('geoStatus').className = 'status-badge status-undetermined';
             document.getElementById('geoStatus').textContent = '未计算';
+            resetResultMetrics();
             
             updateCurves();
             canvasEngine.fitCurves(curve1, curve2);
@@ -2163,13 +2182,18 @@ let curve1 = null;
             btn.textContent = '测试中...';
             resultEl.textContent = '';
             
+            // 固定种子，保证两次运行结果一致（可复现）
+            _stressSeed = 20261019;
+            
             setTimeout(() => {
                 let successCount = 0;
                 let totalTests = 100;
                 let avgIterations = 0;
+                let condFinite = 0, condSingular = 0;
+                let provenSum = 0, tangentSum = 0, completeOk = 0;
+                const PROVE_SAMPLE = 25; // Krawczyk 证明汇总采样前 N 对（enumerate 开销大，避免页面假死）
                 
                 for (let i = 0; i < totalTests; i++) {
-                    // 生成随机曲线
                     const randomCurve1 = generateRandomCurve();
                     const randomCurve2 = generateRandomCurve();
                     
@@ -2182,6 +2206,19 @@ let curve1 = null;
                         if (results.length > 0 && results[0].converged) {
                             successCount++;
                             avgIterations += results[0].iterations;
+                            const c = results[0].condition;
+                            if (c === Infinity || c === -Infinity) condSingular++;
+                            else if (!Number.isNaN(c)) condFinite++;
+                        }
+                        
+                        // Krawczyk 证明汇总（采样前 PROVE_SAMPLE 对，保持响应）
+                        if (i < PROVE_SAMPLE) {
+                            const proof = enumerateIntersections(randomCurve1, randomCurve2, 1e-4);
+                            if (proof) {
+                                provenSum += proof.provenCount || 0;
+                                tangentSum += proof.tangentCount || 0;
+                                if (proof.complete) completeOk++;
+                            }
                         }
                     } catch (e) {
                         // 捕获异常
@@ -2191,8 +2228,11 @@ let curve1 = null;
                 avgIterations /= Math.max(1, successCount);
                 
                 resultEl.innerHTML = `
-                    <span style="color: var(--accent-cyan);">成功率：</span>${(successCount/totalTests*100).toFixed(1)}%<br>
-                    <span style="color: var(--accent-cyan);">平均迭代：</span>${avgIterations.toFixed(1)}次
+                    <span style="color: var(--accent-cyan);">成功率：</span>${(successCount/totalTests*100).toFixed(1)}%（固定种子，可复现）<br>
+                    <span style="color: var(--accent-cyan);">平均迭代：</span>${avgIterations.toFixed(1)}次<br>
+                    <span style="color: var(--accent-cyan);">κ 有限 / 奇异：</span>${condFinite} / ${condSingular}<br>
+                    <span style="color: var(--accent-cyan);">Krawczyk 可证 / 疑似相切：</span>${provenSum} / ${tangentSum}（前 ${PROVE_SAMPLE} 对）<br>
+                    <span style="color: var(--accent-cyan);">全域覆盖：</span>${completeOk}/${Math.min(PROVE_SAMPLE, totalTests)}
                 `;
                 
                 btn.disabled = false;
@@ -2200,6 +2240,12 @@ let curve1 = null;
             }, 100);
         }
         
+        // 固定种子 PRNG：压力测试可复现（同 batch_test / stress_test 口径）
+        let _stressSeed = 20261019;
+        function _stressRnd() {
+            _stressSeed = (_stressSeed * 1664525 + 1013904223) >>> 0;
+            return _stressSeed / 4294967296;
+        }
         function generateRandomCurve() {
             const degree = 3;
             const numPoints = 6;
@@ -2208,10 +2254,10 @@ let curve1 = null;
             
             for (let i = 0; i < numPoints; i++) {
                 controlPoints.push({
-                    x: (Math.random() - 0.5) * 10,
-                    y: (Math.random() - 0.5) * 10
+                    x: (_stressRnd() - 0.5) * 10,
+                    y: (_stressRnd() - 0.5) * 10
                 });
-                weights.push(0.5 + Math.random());
+                weights.push(0.5 + _stressRnd());
             }
             
             const knots = generateKnotVector(degree, numPoints, 'clamped');
