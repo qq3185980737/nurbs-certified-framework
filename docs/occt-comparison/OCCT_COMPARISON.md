@@ -49,6 +49,14 @@ Run each with the `occ` conda env's python (`/root/miniconda3/envs/occ/bin/pytho
 | C: `f=s+0.5t` | tangential corner contact at (0,0) | **0 lines (misses the corner)** | corner cover box retained |
 | D: `f=(s-t)^2` | whole diagonal s=t (degenerate tangency) | **0 lines (misses the whole line)** | cover band encloses it |
 
+### Curve-surface (`GeomAPI_IntCS` and `BRepAlgoAPI_Section`)
+
+| Fixture | True roots | OCCT IntCS | OCCT Section | Certified framework (Section 3.4) |
+|---|---|---|---|---|
+| transverse crossing of a planar graph patch | 1 | 1 | — | certified root |
+| curve osculating a plane (tangent point) | 1 | 2 (duplicate point pair; 1 unique) | — | certified root |
+| **degree-3 curve, three transverse crossings of a paraboloidal graph patch** (residuals ~1e-16 at each root) | **3** | **0 (misses all 3)** | **0 (misses all 3)** | all three certified |
+
 These are precisely the high-order-contact and small-loop configurations that [17] report commercial
 kernels ACIS and OCCT handle unsatisfactorily. The certified interval treatment of Sections 3.4/6.3
 keeps provable completeness (no-missing cover, Proposition 1) where the kernel omits a root or a
