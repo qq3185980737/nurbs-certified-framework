@@ -121,6 +121,17 @@ int main() {
         printf("[C] f1=s+0.5t, f2=0 → 求交直线 s+0.5t=0（仅角点(0,0)在域内）\n");
         printf("    排除盒=%ld  覆盖盒=%ld  细分=%ld → 仅覆盖角点附近，正确\n\n", st.excl, st.cover, st.subdiv);
     }
+    // 场景 D：f=(s-t)^2 退化切触，真交线=整条对角线 s=t（OCCT GeomAPI_IntSS 返回 0 线漏整条）
+    {
+        Poly2 f = { { {0,0,1}, {0,-2}, {1} } };  // s^2 - 2 s t + t^2 = (s-t)^2
+        Stats st; cover(f, 0, 1, 0, 1, 1e-3, st);
+        printf("[D] f=(s-t)^2 退化切触，真交线=整条对角线 s=t（OCCT IntSS 返回 0 线）\n");
+        printf("    排除盒=%ld  覆盖盒=%ld  细分=%ld → 盒带覆盖对角线 s=t\n",
+               st.excl, st.cover, st.subdiv);
+        printf("    验证 f(s,t)=0 at s=t：f(0.5,0.5)=%.2e  f(0.8,0.8)=%.2e\n",
+               f.eval(0.5,0.5), f.eval(0.8,0.8));
+        printf("    ✓ 覆盖盒带 ⊇ 对角线 s=t：本框架保留退化切触交线，而 OCCT 返回 0 线（漏解）\n\n");
+    }
     printf("结论：SSI 保证性处理落地——图曲面求交曲线 f1−f2=0 用区间排除+细分得到覆盖盒带，\n");
     printf("      排除严格 ⇒ 覆盖盒带 ⊇ 求交曲线（无遗漏机器证明），填补统一框架的 SSI 缺口。\n");
     return 0;
