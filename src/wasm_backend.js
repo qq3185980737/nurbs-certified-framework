@@ -47,7 +47,15 @@ export function generateKnotVector(degree, numControlPoints, knotType = 'clamped
         case 'clamped':
             return generateUniformKnotVector(numControlPoints, degree);
         case 'bezier':
-            return generatePiecewiseBezierKnotVector(numControlPoints, degree);
+            // 方案 A：仅当控制点数 = 阶数+1（合法单段 Bezier）时使用真 Bezier 节点；
+            // 多段分片 Bezier 会生成超长节点（不满足 nknots = n+p+1），在 WASM 长度校验
+            // 处被静默丢弃 → 曲线沿用旧句柄（Bezier 选择失效）。故多段回退到 clamped 并提示。
+            if (numControlPoints === degree + 1)
+                return generatePiecewiseBezierKnotVector(numControlPoints, degree);
+            console.warn(
+                `Knot type "bezier" 需控制点数 = 阶数+1（当前 ${numControlPoints} ≠ ${degree}+1），已回退为 clamped`
+            );
+            return generateUniformKnotVector(numControlPoints, degree);
         default:
             console.warn(`未知的 Knot 类型 "${knotType}"，使用默认 clamped`);
             return generateUniformKnotVector(numControlPoints, degree);
