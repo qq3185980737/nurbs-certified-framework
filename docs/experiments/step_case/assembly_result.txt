@@ -1,0 +1,19 @@
+﻿parsed: curves=83 surfs=23 pairs=8 expected=12
+    newton res=0.00e+00 x=(0.3333,0.6714,0.5000)
+    newton res=3.55e-15 x=(0.3333,0.6714,0.5000)
+    newton res=0.00e+00 x=(0.3333,0.6714,0.5000)
+    newton res=0.00e+00 x=(0.3333,0.6714,0.5000)
+    newton res=7.11e-15 x=(0.3333,0.6714,0.5000)
+    newton res=0.00e+00 x=(0.3333,0.6714,0.5000)
+    newton res=7.11e-15 x=(0.3333,0.6714,0.5000)
+    newton res=7.11e-15 x=(0.3333,0.6714,0.5000)
+  pair(edge 67, face 17): expected 1, certified 1, miss 0, extra 0
+  pair(edge 67, face 18): expected 1, certified 1, miss 0, extra 0
+  pair(edge 69, face 17): expected 1, certified 1, miss 0, extra 0
+  pair(edge 69, face 18): expected 1, certified 1, miss 0, extra 0
+  pair(edge 71, face 15): expected 2, certified 2, miss 0, extra 0
+  pair(edge 73, face 15): expected 2, certified 2, miss 0, extra 0
+  pair(edge 75, face 15): expected 2, certified 2, miss 0, extra 0
+  pair(edge 77, face 15): expected 2, certified 2, miss 0, extra 0
+
+summary: pairs=8 expected=12 certified_unique=12 matched=12 missing=0 extra=0 starts_certified=3724 time=221.5 ms
