@@ -183,6 +183,12 @@ target_link_libraries(bench_massive PRIVATE nurbs)
 if(MSVC)
   target_compile_options(bench_massive PRIVATE /fp:precise /utf-8)
 endif()
+# SSI：图曲面求交的覆盖盒带（论文 Table 7 / scene D）
+add_executable(bench_ssi tests/bench_ssi.cpp)
+target_link_libraries(bench_ssi PRIVATE nurbs)
+if(MSVC)
+  target_compile_options(bench_ssi PRIVATE /fp:precise /utf-8)
+endif()
 # 综合：曲线×曲面 + 曲面×曲面 跨类型相交（批量证明）
 add_executable(bench_massive_surf tests/bench_massive_surf.cpp)
 if(MSVC)
