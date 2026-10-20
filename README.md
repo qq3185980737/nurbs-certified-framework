@@ -72,7 +72,7 @@ experiment_*.md / *.json   Detailed experimental results
 - Build & run instructions: `README_LOCAL_RUN.txt`, `cpp/CMakeLists.txt`, `build.mjs`.
 - Regression / ablation scripts: `*.mjs`, `*.py` at repository root.
 - Frontend pressure regression: serve `stress_test.html` over HTTP (60 curated combos + 300 random pairs; captures any alert/exception and reports κ/proof stats).
-- Ground-truth verification: `_ground_truth.py` (e.g. lemniscate self-intersection coordinates to ~1e-16, `min‖∂S/∂s×∂S/∂v‖ = √2·π` independently verified).
+- Ground-truth verification: `_true_selfint.py` — the lemniscate-cylinder patch self-intersects at the parameter pair (0.25, 0.75), and the script certifies that pair with the square Krawczyk box test of Section 5.
 
 ## License
 
