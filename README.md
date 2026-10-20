@@ -76,7 +76,7 @@ experiment_*.md / *.json   Detailed experimental results
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Yang Liu, Xun Wang.
+MIT — see [LICENSE](LICENSE). Copyright (c) 2026 The Authors.
 
 ## Related work
 
