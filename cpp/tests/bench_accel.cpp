@@ -73,6 +73,17 @@ int main() {
     double tSolve = std::chrono::duration<double>(tb2 - tb1).count();
     double tOrig = std::chrono::duration<double>(t1 - t0).count();
 
+    // ---- 加速模式（completeLeakPatch=false）：纯 BVH+LM，不做完备兜底 ----
+    SolverOptions optFast = opt; optFast.completeLeakPatch = false;
+    long long fastIter = 0; int fastInter = 0;
+    auto tf0 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < N; ++i) {
+        auto r = solveWithIndex(ia[i], A[i], ib[i], B[i], optFast);
+        for (auto& s : r) { fastIter += s.iterations; if (s.state == GeometryState::INTERSECTION) fastInter++; }
+    }
+    auto tf1 = std::chrono::high_resolution_clock::now();
+    double tFast = std::chrono::duration<double>(tf1 - tf0).count();
+
     // ---- 解集合一致性 ----
     int agreePairs = 0, checked = 0; double bestRes = 0;
     for (int i = 0; i < N; ++i) {
@@ -97,6 +108,11 @@ int main() {
     printf("          相交解数=%d  LM迭代=%lld（减少 %.1f%%）\n", accInter, accIter,
            100.0 * (1.0 - (double)accIter / origIter));
     printf("求解阶段加速比: %.2f×\n", tOrig / tSolve);
+    // 两种模式必须分开报告：完备模式含 unifiedSolve 兜底（正确性优先，慢），
+    // 加速模式为纯 BVH+LM（快，但只近完备）。论文 Table 5 的 35× 指后者。
+    printf("加速模式  : 求解 %8.2f ms   相交解数=%d  LM迭代=%lld（completeLeakPatch=false）\n",
+           tFast * 1e3, fastInter, fastIter);
+    printf("加速比    : 加速模式/原版 = %.2f×   完备模式/原版 = %.2f×\n", tOrig / tFast, tOrig / tSolve);
     printf("含建索引总加速比: %.2f×\n", tOrig / (tBuild + tSolve));
     printf("相交解数一致: %d / %d 对\n", agreePairs, checked);
     printf("加速交点最大残差: %.3e（应 < 1e-6）\n", bestRes);
