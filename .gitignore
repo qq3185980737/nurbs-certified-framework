@@ -159,3 +159,6 @@ _verify_summary.txt
 # 鏈湴浠ょ墝
 token.txt
 .env
+
+# 新建的优化构建目录
+build_opt/
