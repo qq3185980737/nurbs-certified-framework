@@ -9,7 +9,7 @@ using the OCCT standard interrogation APIs.
 
 - **WSL2 / Ubuntu 22.04 LTS**, `g++ 11.4`.
 - **miniconda3** + conda-forge channel: `conda create -n occ -c conda-forge python=3.11 pythonocc-core`
-  (pythonocc-core bundles a modern OCCT 7.x, MSVC/GCC native, no source build needed).
+  (pythonocc-core bundles **OCCT 8.0.1** in the environment used for all numbers below; MSVC/GCC native, no source build needed).
 - On Windows the certified framework is already built (MSVC `Release /O2 /fp:precise`). The two
   kernels are run as **independent processes** and compared on output files, so no cross-ABI linking
   is required.
@@ -28,6 +28,7 @@ Run each with the `occ` conda env's python (`/root/miniconda3/envs/occ/bin/pytho
 | `compare_ssi_detail.py` | Samples OCCT's single intersection line on fixture A to confirm which diagonal it returns. |
 | `compare_self.py` | Surface self-intersection: folded patch `(u^2-v^2,2uv,u^2+v^2)` via `GeomAPI_IntSS(S,S)` and `BRepCheck_Analyzer`. |
 | `compare_nurbs.py` | Rational (NURBS) curves: rational Bezier quarter-circle and full circle vs straight lines, via `BRepAlgoAPI_Section`. |
+| `compare_ext.py` | **Extended families (Table 11 of the manuscript)**: 3D curve–curve (lines and quadratic), 3D curve–surface (transversal and tangent), bicubic × bicubic SSI, curved 2D overlap between two bowl patches, and a rational quarter-cylinder against a horizontal transversal line and against a ruling (curve on surface). |
 
 ## Observed results (tolerance 1e-9 unless noted)
 
@@ -81,6 +82,25 @@ These are precisely the high-order-contact and small-loop configurations that [1
 kernels ACIS and OCCT handle unsatisfactorily. The certified interval treatment of Sections 3.4/6.3
 keeps provable completeness (no-missing cover, Proposition 1) where the kernel omits a root or a
 degenerate contact.
+
+### Extended families (`compare_ext.py`, Table 11 of the manuscript)
+
+OCCT 8.0.1, tolerance 1e-9:
+
+| Fixture | True result | OCCT | Certified framework |
+|---|---|---|---|
+| 3D curve–curve, two lines crossing | 1 point | 1 point | certified root |
+| 3D curve–curve, quadratic vs line | 1 point | 1 point | certified root |
+| 3D curve–surface, transversal crossing | 1 point | 1 point | certified root |
+| 3D curve–surface, tangency | 1 point | 1 point | certified root |
+| Bicubic × bicubic, interior line | 1 curve | 1 curve | certified line (checked) |
+| Rational quarter-cylinder × horizontal line | 1 point | 1 point | certified root |
+| **Curved 2D overlap (bowl sub-patch)** | 2D region | **0 lines (misses)** | shared region |
+| **Line lying on a rational cylinder** | 1D segment | **26 points, 0 segments** | 1D contact reported |
+
+The transversal three-dimensional configurations agree with the certified framework. The two
+failures are the same kind as in Table 9: a two-dimensional overlap is not reported at all, and a
+one-dimensional contact set is returned as a cloud of isolated points, i.e. of the wrong dimension.
 
 ## Notes
 
