@@ -271,6 +271,7 @@ set(NURBS_EXTRA_BENCHES
   bench_trisurface
   bench_true_selfintersect
   bench_true_selfintersect_r4
+  bench_overlap_nonaffine
 )
 foreach(b ${NURBS_EXTRA_BENCHES})
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/${b}.cpp)
