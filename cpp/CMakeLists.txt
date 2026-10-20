@@ -248,3 +248,32 @@ target_include_directories(nurbs_shared PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/inclu
 if(MSVC)
   target_compile_options(nurbs_shared PRIVATE /fp:precise /utf-8)
 endif()
+
+# ---- 补齐：论文与文档引用、但此前未注册为构建目标的基准 ----
+set(NURBS_EXTRA_BENCHES
+  bench_cover
+  bench_curve_on_surface
+  bench_curve_selfintersect
+  bench_osculate
+  bench_surface_bicubic_cross
+  bench_surface_closed
+  bench_surface_crease
+  bench_surface_degen_normal
+  bench_surface_overlap_curved
+  bench_surface_rational
+  bench_surface_sphere
+  bench_surface_tangent_cs
+  bench_surface_tangent_ss
+  bench_trisurface
+  bench_true_selfintersect
+  bench_true_selfintersect_r4
+)
+foreach(b ${NURBS_EXTRA_BENCHES})
+  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/${b}.cpp)
+    add_executable(${b} tests/${b}.cpp)
+    target_link_libraries(${b} PRIVATE nurbs)
+    if(MSVC)
+      target_compile_options(${b} PRIVATE /fp:precise /utf-8)
+    endif()
+  endif()
+endforeach()
