@@ -251,11 +251,42 @@ int findSpanIndex(int p, double u, const std::vector<double>& knots) {
 // ============================================================================
 // 曲线求值
 // ============================================================================
+// 栈上 de Boor 基函数（避免热路径每次求值分配 3 个 std::vector）。
+// 运算顺序与 deBoorBasis 完全一致，结果逐位相同；p >= 32 时退回 vector 版本。
+namespace {
+constexpr int kMaxStackDegree = 31;
+inline bool deBoorBasisStack(int p, double u, const std::vector<double>& knots, int span,
+                             double* N, double* left, double* right) {
+    if (p < 0 || p > kMaxStackDegree) return false;
+    for (int i = 0; i <= p; ++i) N[i] = 0.0;
+    N[0] = 1.0;
+    for (int j = 1; j <= p; ++j) {
+        left[j] = u - knots[span + 1 - j];
+        right[j] = knots[span + j] - u;
+        double saved = 0.0;
+        for (int r = 0; r < j; ++r) {
+            const double denom = right[r + 1] + left[j - r];
+            const double temp = floatEqual(denom, 0, kKnotTolerance) ? 0.0 : N[r] / denom;
+            N[r] = saved + right[r + 1] * temp;
+            saved = left[j - r] * temp;
+        }
+        N[j] = saved;
+    }
+    return true;
+}
+}  // namespace
+
 Point2 evaluatePoint(const NURBSCurve& curve, double u) {
     validateCurve(curve);
     u = std::max(curve.uMin, std::min(curve.uMax, u));
     const int span = findSpanIndex(curve.degree, u, curve.knots);
-    const std::vector<double> N = deBoorBasis(curve.degree, u, curve.knots, span);
+    double Ns[kMaxStackDegree + 1], Ls[kMaxStackDegree + 1], Rs[kMaxStackDegree + 1];
+    std::vector<double> Nv_vec;
+    const double* N = Ns;
+    if (!deBoorBasisStack(curve.degree, u, curve.knots, span, Ns, Ls, Rs)) {
+        Nv_vec = deBoorBasis(curve.degree, u, curve.knots, span);
+        N = Nv_vec.data();
+    }
 
     double hx = 0.0, hy = 0.0, hw = 0.0;
     for (int i = 0; i <= curve.degree; ++i) {
@@ -346,11 +377,25 @@ std::pair<Point2, Point2> evaluatePointAndDerivative(const NURBSCurve& curve, do
         return { evaluatePoint(curve, u), evaluateFirstDerivative(curve, u) };
     // 内部点：一次扫描同时出点+一阶导（公式与分别调用完全相同 → 逐位一致）
     const int span = findSpanIndex(curve.degree, uClamped, curve.knots);
-    const std::vector<double> N = deBoorBasis(curve.degree, uClamped, curve.knots, span);
+    double Ns[kMaxStackDegree + 1], Ls[kMaxStackDegree + 1], Rs[kMaxStackDegree + 1];
+    double Ms[kMaxStackDegree + 1], Ls2[kMaxStackDegree + 1], Rs2[kMaxStackDegree + 1];
+    std::vector<double> N_vec, Nm1_vec;
+    const double* N = Ns;
+    const double* Nm1 = Ms;
+    if (!deBoorBasisStack(curve.degree, uClamped, curve.knots, span, Ns, Ls, Rs)) {
+        N_vec = deBoorBasis(curve.degree, uClamped, curve.knots, span);
+        N = N_vec.data();
+    }
     const int s2 = findSpanIndex(curve.degree - 1, uClamped, curve.knots);
-    const std::vector<double> Nm1 = deBoorBasis(curve.degree - 1, uClamped, curve.knots, s2);
+    if (!deBoorBasisStack(curve.degree - 1, uClamped, curve.knots, s2, Ms, Ls2, Rs2)) {
+        Nm1_vec = deBoorBasis(curve.degree - 1, uClamped, curve.knots, s2);
+        Nm1 = Nm1_vec.data();
+    }
     const int base2 = s2 - (curve.degree - 1);
-    std::vector<double> dN(curve.degree + 1, 0.0);
+    double dNs[kMaxStackDegree + 1] = {0.0};
+    std::vector<double> dN_vec;
+    double* dN = dNs;
+    if (curve.degree > kMaxStackDegree) { dN_vec.assign(curve.degree + 1, 0.0); dN = dN_vec.data(); }
     for (int k = 0; k <= curve.degree; ++k) {
         const int idx = span - curve.degree + k;
         const int j1 = idx - base2, j2 = idx + 1 - base2;
