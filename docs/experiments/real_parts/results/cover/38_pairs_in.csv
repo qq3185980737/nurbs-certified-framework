@@ -1,0 +1,5 @@
+part,fidA,piA,fidB,piB,src,bbox_overlap
+38,22,0,24,0,pos,1
+38,44,0,66,0,pos,1
+38,117,0,203,0,pos,1
+38,263,0,277,0,neg,0

@@ -1,0 +1,13 @@
+fixture,epsge,topology_stat,num_int_points,num_int_curves,guide_points,traced_curves,traced_ctrl_pts,trace_errors,res_point,res_guide,res_trace,time_topology_ms,time_trace_ms,truth
+A,1.0e-06,0,0,1,3,1,7,0,0.000e+00,0.000e+00,1.119e-16,0.725,0.040,"1 curve: diagonal s=t (transverse except at origin)"
+A,1.0e-04,0,0,1,3,1,7,0,0.000e+00,0.000e+00,1.119e-16,0.605,0.038,"1 curve: diagonal s=t (transverse except at origin)"
+B,1.0e-06,0,0,0,0,0,0,0,0.000e+00,0.000e+00,0.000e+00,0.002,0.000,"0 intersections"
+B,1.0e-04,0,0,0,0,0,0,0,0.000e+00,0.000e+00,0.000e+00,0.001,0.000,"0 intersections"
+C,1.0e-06,0,1,0,0,0,0,0,0.000e+00,0.000e+00,0.000e+00,0.162,0.000,"1 point: corner (0,0) tangency"
+C,1.0e-04,0,1,0,0,0,0,0,0.000e+00,0.000e+00,0.000e+00,0.106,0.000,"1 point: corner (0,0) tangency"
+D,1.0e-06,0,346,1628,3256,92,368,1536,1.130e-16,9.537e-07,1.231e-14,2894.952,28.612,"1 tangential/degenerate curve s=t"
+D,1.0e-04,0,54,70,140,5,29,65,3.815e-06,6.104e-05,1.727e-14,116.095,1.206,"1 tangential/degenerate curve s=t"
+E,1.0e-06,0,0,1,2,1,157,0,0.000e+00,4.163e-17,4.130e-07,0.113,0.648,"1 interior curve: u^3 + v^3 = 0.1 (bicubic x bicubic)"
+E,1.0e-04,0,0,1,2,1,52,0,0.000e+00,4.163e-17,2.928e-05,0.134,0.250,"1 interior curve: u^3 + v^3 = 0.1 (bicubic x bicubic)"
+F,1.0e-06,0,1,0,0,0,0,0,1.110e-16,0,0,0.061,0,"1 point: (0.866025,0.5,0.5)"
+F,1.0e-04,0,1,0,0,0,0,0,1.110e-16,0,0,0.032,0,"1 point: (0.866025,0.5,0.5)"

@@ -1,0 +1,25 @@
+# matrix-representation baseline -- MINIMAL REPRODUCTION
+# not a full implementation of Thang-Buse-Mourrain 2009 / Jia et al. 2022
+# numpy 2.4.6
+
+=== (1) curve x bicubic graph surface: eigenvalues of companion matrix ===
+case,n_real_roots_in_[0,1],n_distinct_roots,n_eigenvalues_total,n_roots_truth,max_residual,time_ms,roots
+CS1_transverse,1,1,3,1,0.000e+00,0.232,"0.005983"
+CS3_three_roots,3,3,3,3,4.163e-17,0.047,"0.200000 0.500000 0.800000"
+CS1_tangential_double,2,1,2,1,2.776e-17,0.034,"0.500000 0.500000"
+CS1_rational_arc,1,1,12,1,2.220e-16,0.092,"0.229367"
+
+=== (1b) certified interval exclusion on the same reduced polynomial ===
+case,cover_boxes,excluded_boxes,certified_root_clusters,time_ms
+CS1_transverse,1,34,1,0.743
+CS3_three_roots,21,622,3,10.551
+CS1_tangential_double,185364,262142,1,7014.556
+CS1_rational_arc,1,34,1,2.455
+
+=== (2) 2x2/3x3 graph-patch surface/surface (Jia 2022 minimal) ===
+fixture,nt,roots_total,curve_points,complex_pts,max_residual,time_ms,roots_per_t_min,roots_per_t_max
+A,201,202,202,0,0.000e+00,18.291,1,2
+B,201,0,0,0,0.000e+00,0.674,0,0
+C,201,1,1,0,0.000e+00,5.080,0,1
+D,201,402,402,0,1.110e-16,25.591,2,2
+E,201,93,93,402,2.776e-17,15.509,0,1

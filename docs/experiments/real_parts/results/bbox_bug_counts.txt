@@ -1,0 +1,18 @@
+### part 228
+PROBE data=/mnt/d/qqdownload/nurbs-certified-framework/docs/experiments/real_parts/data/228.txt faces=93 patches=103 facepairs=4278 overlap_facepairs=573 patchpairs=711 overlap_patchpairs=662 cand=573 pos=0 neg=0 tau=0.0200 cap=4000000
+### part 387
+PROBE data=/mnt/d/qqdownload/nurbs-certified-framework/docs/experiments/real_parts/data/387.txt faces=82 patches=110 facepairs=3321 overlap_facepairs=666 patchpairs=1188 overlap_patchpairs=1098 cand=666 pos=0 neg=0 tau=0.0200 cap=4000000
+### part 107
+PROBE data=/mnt/d/qqdownload/nurbs-certified-framework/docs/experiments/real_parts/data/107.txt faces=132 patches=804 facepairs=8646 overlap_facepairs=1236 patchpairs=17174 overlap_patchpairs=6704 cand=1236 pos=0 neg=0 tau=0.0200 cap=4000000
+### part 411
+PROBE data=/mnt/d/qqdownload/nurbs-certified-framework/docs/experiments/real_parts/data/411.txt faces=76 patches=7480 facepairs=2850 overlap_facepairs=603 patchpairs=3326433 overlap_patchpairs=39562 cand=603 pos=0 neg=0 tau=0.0200 cap=4000000
+### part 136
+PROBE data=/mnt/d/qqdownload/nurbs-certified-framework/docs/experiments/real_parts/data/136.txt faces=1189 patches=3577 facepairs=706266 overlap_facepairs=101257 patchpairs=471070 overlap_patchpairs=326430 cand=101257 pos=0 neg=0 tau=0.0200 cap=4000000
+### part 10
+PROBE data=/mnt/d/qqdownload/nurbs-certified-framework/docs/experiments/real_parts/data/10.txt faces=499 patches=1054 facepairs=124251 overlap_facepairs=14323 patchpairs=53207 overlap_patchpairs=37196 cand=14323 pos=0 neg=0 tau=0.0200 cap=4000000
+### part 38
+PROBE data=/mnt/d/qqdownload/nurbs-certified-framework/docs/experiments/real_parts/data/38.txt faces=282 patches=937 facepairs=39621 overlap_facepairs=6405 patchpairs=54285 overlap_patchpairs=25301 cand=6405 pos=0 neg=0 tau=0.0200 cap=4000000
+### part 248
+PROBE data=/mnt/d/qqdownload/nurbs-certified-framework/docs/experiments/real_parts/data/248.txt faces=56 patches=197 facepairs=1540 overlap_facepairs=235 patchpairs=2821 overlap_patchpairs=920 cand=235 pos=0 neg=0 tau=0.0200 cap=4000000
+### part 115
+PROBE data=/mnt/d/qqdownload/nurbs-certified-framework/docs/experiments/real_parts/data/115.txt faces=66 patches=279 facepairs=2145 overlap_facepairs=465 patchpairs=5948 overlap_patchpairs=2218 cand=465 pos=0 neg=0 tau=0.0200 cap=4000000

@@ -2031,10 +2031,11 @@ inline double coincidence_ratio(const RBezierSurface& A, const RBezierSurface& B
 // ============================================================================
 
 struct PairClass {
-    int type = 3;            // 0=disjoint, 1=1D certified, 2=2D coincidence, 3=undecided(contact)
+    int type = 3;            // 0=disjoint, 1=1D certified, 2=2D coincidence, 3=undecided(contact), 4=coplanar overlap
     double coincidence = 0.0;
     long cover = 0, certified = 0, undecided = 0;
     long components = 0;
+    int coplanar_overlap = 0;   // 1=contain, 2=partial (exact_coplanar_overlap)
 };
 
 // 共面接触检测：抽样若干覆盖盒中点，看法向是否平行（不要求盒子包含解）
@@ -2058,11 +2059,32 @@ inline bool coplanar_candidate(const RBezierSurface& A, const RBezierSurface& B,
     return checked > 0 && parallel * 10 >= checked * 9;
 }
 
-inline PairClass classify_pair(const RBezierSurface& A, const RBezierSurface& B, double tau) {
+// 面片笛卡尔尺寸（控制点归一化跨度），用于共面判定阈值
+inline double patch_scale(const RBezierSurface& S) {
+    double lo[3] = {1e300, 1e300, 1e300}, hi[3] = {-1e300, -1e300, -1e300};
+    double wm = S.wmin > 0 ? S.wmin : 1e-9;
+    double wM = S.wmax > 0 ? S.wmax : 1.0;
+    for (const auto& p : S.P)
+        for (int c = 0; c < 3; ++c) {
+            double a = p[c].lo / wM, b = p[c].hi / wm;
+            lo[c] = std::min(lo[c], a); hi[c] = std::max(hi[c], b);
+        }
+    return std::max(hi[0] - lo[0], std::max(hi[1] - lo[1], hi[2] - lo[2]));
+}
+
+inline PairClass classify_pair(const RBezierSurface& A, const RBezierSurface& B, double tau, long node_cap = 4000000) {
     PairClass pc;
-    auto r = cover(A, B, tau);
+    // ①' 共面重叠快速预检：cover 之前，避免共面细分失控
+    {
+        double sc = std::max(patch_scale(A), patch_scale(B));
+        int cp = exact_coplanar_overlap(A, B, sc);
+        if (cp > 0) { pc.type = 4; pc.coplanar_overlap = cp; return pc; }
+    }
+    auto r = cover(A, B, tau, 60, node_cap);
     pc.cover = (long)r.boxes.size();
     if (r.boxes.empty()) { pc.type = 0; return pc; }
+    // 覆盖触顶或 box 超 certify 预算（接触/贴合面）→ 跳过 certify 标记未决，避免 certify 爆炸
+    if (pc.cover >= node_cap / 2 || pc.cover > 2500) { pc.type = 3; return pc; }
     // ① 2D 重合证书（点包含 + 法向）
     pc.coincidence = coincidence_ratio(A, B, 0.15, 0.85, 0.15, 0.85, 2);
     if (pc.coincidence >= 0.9) { pc.type = 2; return pc; }

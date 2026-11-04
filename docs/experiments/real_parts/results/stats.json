@@ -1,0 +1,7 @@
+{
+ "batch_rows": 28,
+ "repro_rows": 12,
+ "probe_parts": 20,
+ "conflicts": 144,
+ "cover_parts": 6
+}

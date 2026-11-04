@@ -1,0 +1,5 @@
+fidA,piA,fidB,piB,ncover,npoints,inside_A,inside_B,inside_both,min_miss_Linf
+22,0,24,0,421,40,40,40,40,0
+44,0,66,0,1093,40,40,40,40,0
+117,0,203,0,243,40,40,40,40,0
+263,0,277,0,33,40,40,40,40,0
