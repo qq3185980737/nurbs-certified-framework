@@ -272,6 +272,24 @@ set(NURBS_EXTRA_BENCHES
   bench_true_selfintersect
   bench_true_selfintersect_r4
   bench_overlap_nonaffine
+  bench_cert_ssi
+  bench_cert_step
+  bench_theory_tests
+  bench_miss_verify
+  bench_probe_pair
+  bench_tangency_chain
+  bench_near_tangent
+  bench_nurbs_bezier
+  bench_interval_tests
+  bench_interval_tests2
+  bench_acis_verify
+  bench_cert_export
+  bench_cert_probe
+  bench_cert_probe2
+  bench_cert_export_rat
+  bench_cert_export_nurbs
+  bench_cert_export_types
+  bench_cert_batch
 )
 foreach(b ${NURBS_EXTRA_BENCHES})
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/${b}.cpp)

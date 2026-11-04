@@ -33,23 +33,17 @@ struct Interval {
     double width() const { return hi - lo; }
 };
 
-#ifdef NURBS_NATIVE_ROUNDING
-#  define NURBS_RC_DOWN _RC_DOWN
-#  define NURBS_RC_UP   _RC_UP
-#  define NURBS_OUTWARD(lo, hi) ((void)0)
-struct RoundingGuard {
-    unsigned old_;
-    explicit RoundingGuard(unsigned rc) { _controlfp_s(&old_, rc, _MCW_RC); }
-    ~RoundingGuard() { unsigned t; _controlfp_s(&t, old_, _MCW_RC); }
-};
-#else
+// 舍入策略（2026-10 修订）：所有平台统一采用 std::nextafter 向外扩 1 ulp。
+// 原因：MSVC 的 _controlfp_s 切换舍入模式在 /O2 下不可靠（实测模式会泄漏，
+//       且 NURBS_OUTWARD 空操作会使 enclosures 失去保证），而论文正文描述的
+//       正是 "outward widening (nextafter) after each elementary operation"。
+// 统一 nextafter 后：与编译器/平台无关，严格包含真值；代价为每步多 1 ulp。
 #  define NURBS_RC_DOWN 0
 #  define NURBS_RC_UP   1
 #  define NURBS_OUTWARD(lo, hi) \
      do { (lo) = std::nextafter((lo), -std::numeric_limits<double>::infinity()); \
           (hi) = std::nextafter((hi),  std::numeric_limits<double>::infinity()); } while (0)
 struct RoundingGuard { explicit RoundingGuard(unsigned) {} ~RoundingGuard() {} };
-#endif
 
 inline Interval iadd(const Interval& a, const Interval& b) {
     Interval r;
