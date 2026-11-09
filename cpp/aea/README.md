@@ -36,7 +36,31 @@ cpp/aea/
   verify/
     ssi_verifier.py        Python reference verifier (stdlib only)
     certs/                 small example certificates
+  data/raw/                local cache: raw STEP files (gitignored)
+  data/case/               local cache: converted .txt cases (gitignored)
+  certificates/            local cache: full E1 set + generated certs (gitignored)
 ```
+
+## Local data cache (not committed)
+
+The large inputs and certificate archives are stored under `cpp/aea` for local
+reproduction, but are excluded from git:
+
+```text
+data/raw/fusion/           100 Fusion STEP files
+data/raw/mfcad/            100 MFCAD STEP files
+data/raw/mfcad_repo/       sparse MFCAD clone (~190 MB)
+data/raw/abc/              ABC sample + metadata
+data/raw/samples/          small Fusion/MFCAD samples
+data/case/fusion/          100 converted Fusion cases
+data/case/mfcad/           100 converted MFCAD cases
+certificates/e1/           645 E1 certificates
+certificates/samples/      individual cert_*.json files
+certificates/generated/    acis + random certificate sets from the generator
+```
+
+These paths are in `.gitignore`; they are local caches, not part of the git
+history. The full certificate archive is also on Zenodo (`10.5281/zenodo.23607833`).
 
 ## Environment
 

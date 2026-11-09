@@ -1,5 +1,6 @@
 data/raw/
 data/case/
+certificates/
 build/
 *.aux
 *.log
