@@ -60,7 +60,7 @@ certificates/generated/    acis + random certificate sets from the generator
 ```
 
 These paths are in `.gitignore`; they are local caches, not part of the git
-history. The full certificate archive is also on Zenodo (`10.5281/zenodo.23607833`).
+history. The full certificate archive is also on Zenodo (`10.5281/zenodo.23602457`).
 
 ## Environment
 
@@ -179,7 +179,7 @@ Expected (after excluding 98 adjacent face pairs, τ = 0.02): 2,750 patch pairs,
 - Fusion 360 Gallery: research dataset; see the Autodesk license.
 - MFCAD++: CC BY; see the Queen's University Belfast dataset page.
 - This directory ships **scripts, model IDs and results only**, not the raw STEP data.
-- Full certificate archive and both verifiers: Zenodo `10.5281/zenodo.23607833`.
+- Full certificate archive and both verifiers: Zenodo `10.5281/zenodo.23602457`.
 
 ## Scope
 

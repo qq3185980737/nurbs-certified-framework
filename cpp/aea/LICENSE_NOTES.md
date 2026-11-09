@@ -14,7 +14,7 @@ models.
   are provided for inspection and reproduction of the manuscript results. No licence
   is granted for third-party data beyond the terms of the datasets above.
 - **Certificate data**: the full certificate archive is on Zenodo
-  (`10.5281/zenodo.23607833`); only small example certificates are included here.
+  (`10.5281/zenodo.23602457`); only small example certificates are included here.
 
 Do not upload the raw STEP files, converted case files or generated certificate
 archives to public repositories unless the dataset licence explicitly permits it.
