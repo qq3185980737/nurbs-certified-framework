@@ -2031,7 +2031,7 @@ inline double coincidence_ratio(const RBezierSurface& A, const RBezierSurface& B
 // ============================================================================
 
 struct PairClass {
-    int type = 3;            // 0=disjoint, 1=1D certified, 2=2D coincidence, 3=undecided(contact), 4=coplanar overlap
+    int type = 3;            // 0=disjoint, 1=1D certified, 2=2D coincidence, 3=undecided(contact), 4=coplanar overlap, 5=cover-limit, 6=tangent candidate, 7=patch-boundary
     double coincidence = 0.0;
     long cover = 0, certified = 0, undecided = 0;
     long components = 0;
@@ -2059,6 +2059,27 @@ inline bool coplanar_candidate(const RBezierSurface& A, const RBezierSurface& B,
     return checked > 0 && parallel * 10 >= checked * 9;
 }
 
+// 切触候选：覆盖盒中点处法向接近平行（比共面判定宽松，仅用于分类，不认证）
+inline bool tangent_candidate(const RBezierSurface& A, const RBezierSurface& B,
+                              const std::vector<Box4>& boxes, int samples = 12) {
+    int checked = 0, near_parallel = 0;
+    for (std::size_t i = 0; i < boxes.size() && checked < samples; i += std::max<std::size_t>(1, boxes.size() / samples)) {
+        const Box4& X = boxes[i];
+        Interval s1[3], a1[3], a2[3], s2[3], b1[3], b2[3];
+        if (!eval_rational_duv(A, X.u, X.v, s1, a1, a2)) continue;
+        if (!eval_rational_duv(B, X.s, X.t, s2, b1, b2)) continue;
+        double n1[3], n2[3];
+        cross3_mid(a1, a2, n1); cross3_mid(b1, b2, n2);
+        double l1 = std::sqrt(n1[0]*n1[0]+n1[1]*n1[1]+n1[2]*n1[2]);
+        double l2 = std::sqrt(n2[0]*n2[0]+n2[1]*n2[1]+n2[2]*n2[2]);
+        if (l1 < 1e-12 || l2 < 1e-12) continue;
+        double c = std::fabs(n1[0]*n2[0]+n1[1]*n2[1]+n1[2]*n2[2]) / (l1*l2);
+        ++checked;
+        if (c > 0.95) ++near_parallel;
+    }
+    return checked > 0 && near_parallel * 2 >= checked;
+}
+
 // 面片笛卡尔尺寸（控制点归一化跨度），用于共面判定阈值
 inline double patch_scale(const RBezierSurface& S) {
     double lo[3] = {1e300, 1e300, 1e300}, hi[3] = {-1e300, -1e300, -1e300};
@@ -2070,6 +2091,18 @@ inline double patch_scale(const RBezierSurface& S) {
             lo[c] = std::min(lo[c], a); hi[c] = std::max(hi[c], b);
         }
     return std::max(hi[0] - lo[0], std::max(hi[1] - lo[1], hi[2] - lo[2]));
+}
+
+inline bool all_boxes_on_patch_boundary(const std::vector<Box4>& boxes, double eps = 1e-9) {
+    if (boxes.size() < 2) return false;
+    for (const Box4& X : boxes) {
+        const bool b = X.u.lo <= eps || X.u.hi >= 1.0 - eps ||
+                       X.v.lo <= eps || X.v.hi >= 1.0 - eps ||
+                       X.s.lo <= eps || X.s.hi >= 1.0 - eps ||
+                       X.t.lo <= eps || X.t.hi >= 1.0 - eps;
+        if (!b) return false;
+    }
+    return true;
 }
 
 inline PairClass classify_pair(const RBezierSurface& A, const RBezierSurface& B, double tau, long node_cap = 4000000) {
@@ -2084,7 +2117,7 @@ inline PairClass classify_pair(const RBezierSurface& A, const RBezierSurface& B,
     pc.cover = (long)r.boxes.size();
     if (r.boxes.empty()) { pc.type = 0; return pc; }
     // 覆盖触顶或 box 超 certify 预算（接触/贴合面）→ 跳过 certify 标记未决，避免 certify 爆炸
-    if (pc.cover >= node_cap / 2 || pc.cover > 2500) { pc.type = 3; return pc; }
+    if (pc.cover >= node_cap / 2 || pc.cover > 2500) { pc.type = 5; return pc; }
     // ① 2D 重合证书（点包含 + 法向）
     pc.coincidence = coincidence_ratio(A, B, 0.15, 0.85, 0.15, 0.85, 2);
     if (pc.coincidence >= 0.9) { pc.type = 2; return pc; }
@@ -2118,8 +2151,11 @@ inline PairClass classify_pair(const RBezierSurface& A, const RBezierSurface& B,
         }
         return pc;
     }
-    // ③ 共面/接触候选（2D 证书未过、1D 认证未过）
-    pc.type = coplanar_candidate(A, B, r.boxes) ? 4 : 3;
+    // ③ 共面/切触/接触候选（2D 证书未过、1D 认证未过）
+    if (coplanar_candidate(A, B, r.boxes)) pc.type = 4;
+    else if (tangent_candidate(A, B, r.boxes)) pc.type = 6;
+    else if (all_boxes_on_patch_boundary(r.boxes)) pc.type = 7;
+    else pc.type = 3;
     return pc;
 }
 

@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this reproduction package, please cite the manuscript and the Zenodo artifact."
+title: "AEA reproduction package: Verifiable Certificates for Surface-Surface Intersection Output"
+authors:
+  - family-names: "Liu"
+    given-names: "Yang"
+  - family-names: "Wang"
+    given-names: "Xun"
+version: "1.0.0"
+date-released: "2026-11-09"
+license: "See LICENSE_NOTES.md"

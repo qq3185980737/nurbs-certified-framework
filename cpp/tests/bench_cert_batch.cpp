@@ -129,6 +129,8 @@ static void emit_patch(std::string& s, const RBezierSurface& P) {
     s += "]}";
 }
 
+static long long g_bytes = 0;
+
 static bool write_cert(const RBezierSurface& A, const RBezierSurface& B, double tau,
                        int max_depth, const std::string& path) {
     for (const auto& P : { A.P, B.P })
@@ -146,6 +148,7 @@ static bool write_cert(const RBezierSurface& A, const RBezierSurface& B, double 
     if (!f) return false;
     std::fwrite(s.data(), 1, s.size(), f);
     std::fclose(f);
+    g_bytes += (long long)s.size();
     return true;
 }
 
@@ -192,6 +195,7 @@ int main(int argc, char** argv) {
     double tau = std::atof(argv[4]);
     int max_depth = (argc >= 6) ? std::atoi(argv[5]) : 40;
     int made = 0;
+    auto t_start = std::chrono::high_resolution_clock::now();
     if (mode == "acis") {
         std::ifstream f(argv[2]);
         if (!f) { std::printf("cannot open %s\n", argv[2]); return 1; }
@@ -289,7 +293,11 @@ int main(int argc, char** argv) {
             }
         }
     }
+    auto t_end = std::chrono::high_resolution_clock::now();
+    double sec = std::chrono::duration<double>(t_end - t_start).count();
     std::printf("wrote %d certificates to %s (mode=%s tau=%.3f)\n", made, outdir.c_str(), mode.c_str(), tau);
+    std::printf("GENERATION certificates=%d time_s=%.6f bytes=%lld mb=%.6f ms_per_cert=%.6f\n",
+                made, sec, g_bytes, g_bytes / 1048576.0, made ? sec * 1000.0 / made : 0.0);
     return 0;
 }
 

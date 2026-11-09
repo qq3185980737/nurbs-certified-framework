@@ -11,6 +11,7 @@
 #include <array>
 #include <string>
 #include <fstream>
+#include <set>
 
 #include "nurbs/cert_ssi.hpp"
 
@@ -44,8 +45,17 @@ int main(int argc, char** argv) {
 
     std::vector<std::vector<RBezierSurface>> surfs;
     std::string tok;
+    std::set<std::pair<int,int>> adjacent;
     while (f >> tok) {
         if (tok == "NSURF") { int n; f >> n; surfs.resize(n); }
+        else if (tok == "NADJ") {
+            int n; f >> n;
+            for (int k = 0; k < n; ++k) {
+                int i, j; f >> i >> j;
+                if (i > j) { int tmp = i; i = j; j = tmp; }
+                adjacent.insert({i, j});
+            }
+        }
         else if (tok == "NURB") {
             // NURB fid conv du dv nu nv / U knots / V knots / poles(w 含权)
             int fid, conv, du, dv, nu, nv;
@@ -97,11 +107,13 @@ int main(int argc, char** argv) {
     int ns = (int)surfs.size();
     std::printf("parsed %d faces, tau=%.4f\n", ns, tau);
     long pairs = 0, intersecting = 0, disjoint = 0, branches = 0, cert_ok = 0, undec = 0;
-    long t_1d = 0, t_2d = 0, t_copl = 0, t_und = 0;
+    long adjacent_skipped = 0;
+    long t_1d = 0, t_2d = 0, t_copl = 0, t_und = 0, t_cover = 0, t_tang = 0, t_bound = 0;
     double ms_total = 0.0;
     for (int a = 0; a < ns; ++a) {
         for (int b = a + 1; b < ns; ++b) {
             if (only_i >= 0 && (a != only_i || b != only_j)) continue;
+            if (only_i < 0 && adjacent.count({a, b})) { ++adjacent_skipped; continue; }
             for (const auto& A : surfs[a]) {
                 for (const auto& B : surfs[b]) {
                     ++pairs;
@@ -115,6 +127,9 @@ int main(int argc, char** argv) {
                         if (pc.type == 1) { ++t_1d; branches += pc.components; }
                         else if (pc.type == 2) ++t_2d;
                         else if (pc.type == 4) ++t_copl;
+                        else if (pc.type == 5) ++t_cover;
+                        else if (pc.type == 6) ++t_tang;
+                        else if (pc.type == 7) ++t_bound;
                         else ++t_und;
                         cert_ok += pc.certified;
                         undec += pc.undecided;
@@ -125,8 +140,8 @@ int main(int argc, char** argv) {
             }
         }
     }
-    std::printf("\nRESULT face-pairs=%ld | disjoint=%ld | 1D_certified=%ld (comps=%ld) | 2D_coincidence=%ld | coplanar_contact=%ld | undecided=%ld\n",
-                pairs, disjoint, t_1d, branches, t_2d, t_copl, t_und);
+    std::printf("\nRESULT face-pairs=%ld | disjoint=%ld | 1D_certified=%ld (comps=%ld) | 2D_coincidence=%ld | coplanar_contact=%ld | tangent_candidate=%ld | cover_limit=%ld | patch_boundary=%ld | undecided=%ld | adjacent_skipped=%ld\n",
+                pairs, disjoint, t_1d, branches, t_2d, t_copl, t_tang, t_cover, t_bound, t_und, adjacent_skipped);
     std::printf("       certified_boxes=%ld undecided_boxes=%ld time=%.1f ms (%.2f ms/pair)\n",
                 cert_ok, undec, ms_total, ms_total / std::max(1L, pairs));
     return 0;
