@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // cert_verify.cpp -- Route C: independent C++ exact-rational certificate verifier
 //   Build (WSL): g++ -O3 -march=native -std=c++17 cert_verify.cpp -o cert_verify -lgmpxx -lgmp
 //   Usage: cert_verify <cert.json> [--chunked] [--jobs N]
@@ -128,7 +128,10 @@ static Q parse_rat(const std::string& s) {
     if (s.find('/') != std::string::npos) {
         Q q; mpq_set_str(q.get_mpq_t(), s.c_str(), 10); q.canonicalize(); return q;
     }
-    return q_from_double(std::stod(s));
+    size_t p = (!s.empty() && (s[0] == '+' || s[0] == '-')) ? 1 : 0;
+    if (s.size() > p + 2 && s[p] == '0' && (s[p + 1] == 'x' || s[p + 1] == 'X'))
+        return q_from_double(std::stod(s));
+    throw std::runtime_error("numeric string must be n/d or hex float");
 }
 static double qd(const Q& q) { return q.get_d(); }
 
@@ -772,7 +775,24 @@ static bool positive_weights(const Patch& p) {
 }
 static void verify_tree(Ctx& c, const J& node, const Patch& A, const Patch& B) {
     c.st->nodes++;
-    if (node.get("kind") && node.get("kind")->s == "leaf") {
+    const J* boxj = node.get("box");
+    if (!boxj || boxj->t != J::ARR || boxj->a.size() != 8) {
+        c.errs->push_back("invalid tree box");
+        return;
+    }
+    auto pb = parse_box(*boxj);
+    for (int k = 0; k < 4; ++k) {
+        if (pb[k][0] < 0 || pb[k][1] > 1 || pb[k][0] > pb[k][1]) {
+            c.errs->push_back("box outside [0,1]^4 or invalid");
+            return;
+        }
+    }
+    const J* kind = node.get("kind");
+    if (!kind || kind->t != J::STR) {
+        c.errs->push_back("tree node has no kind");
+        return;
+    }
+    if (kind->s == "leaf") {
         const J* stj = node.get("status");
         if (!stj || (stj->s != "excluded" && stj->s != "output")) {
             c.errs->push_back("unknown leaf status");
@@ -785,7 +805,7 @@ static void verify_tree(Ctx& c, const J& node, const Patch& A, const Patch& B) {
             return;
         }
         c.st->output++;
-        auto box = parse_box(*node.get("box"));
+        auto box = pb;
         I U = I(box[0][0], box[0][1]), V = I(box[1][0], box[1][1]);
         I S = I(box[2][0], box[2][1]), T = I(box[3][0], box[3][1]);
         auto cl = node.get("claimed_slice");
@@ -802,11 +822,33 @@ static void verify_tree(Ctx& c, const J& node, const Patch& A, const Patch& B) {
         }
         return;
     }
-    int axis = (int)node.get("axis")->num;
-    const J& ch = *node.get("children");
-    auto pb = parse_box(*node.get("box"));
+    if (kind->s != "node") {
+        c.errs->push_back("unknown node kind");
+        return;
+    }
+    const J* axisj = node.get("axis");
+    if (!axisj || axisj->t != J::NUM) {
+        c.errs->push_back("tree node has no axis");
+        return;
+    }
+    int axis = (int)axisj->num;
+    if (axis < 0 || axis > 3) {
+        c.errs->push_back("invalid tree axis");
+        return;
+    }
+    const J* chj = node.get("children");
+    if (!chj || chj->t != J::ARR || chj->a.size() != 2) {
+        c.errs->push_back("tree node must have two children");
+        return;
+    }
+    const J& ch = *chj;
     for (int side = 0; side < 2; ++side) {
-        auto cb = parse_box(*ch.a[side].get("box"));
+        const J* cbj = ch.a[side].get("box");
+        if (!cbj || cbj->t != J::ARR || cbj->a.size() != 8) {
+            c.errs->push_back("invalid child box");
+            return;
+        }
+        auto cb = parse_box(*cbj);
         for (int k = 0; k < 4; ++k) {
             Q mid = (pb[k][0] + pb[k][1]) / 2;
             Q lo = pb[k][0], hi = pb[k][1];
@@ -1230,7 +1272,6 @@ static void verify_chunked_cert(const J& cert, Stats& st, std::vector<std::strin
         for (size_t i = 0; i < tasks.size(); ++i) {
             st.nodes += sts[i].nodes; st.excluded += sts[i].excluded; st.output += sts[i].output;
             st.cert_ok += sts[i].cert_ok; st.cert_fail += sts[i].cert_fail;
-            st.cert_ok += sts[i].cert_ok;
             st.p7_ok += sts[i].p7_ok; st.p7_fail += sts[i].p7_fail;
             st.k4_ok += sts[i].k4_ok; st.k4_fail += sts[i].k4_fail;
             st.coinc_ok += sts[i].coinc_ok; st.tan_ok += sts[i].tan_ok;

@@ -6,9 +6,11 @@ authors:
     given-names: "Yang"
   - family-names: "Wang"
     given-names: "Xun"
-version: "0.1.0"
+version: "0.1.1"
 date-released: "2026-11-25"
-doi: "10.5281/zenodo.24526577"
+doi: "10.5281/zenodo.24535053"
 license: MIT
 repository-code: "https://github.com/qq3185980737/nurbs-certified-framework"
 url: "https://github.com/qq3185980737/nurbs-certified-framework/tree/main/softwarex"
+
+

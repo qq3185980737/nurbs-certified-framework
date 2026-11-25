@@ -129,7 +129,7 @@ https://doi.org/10.5281/zenodo.24126465
 The SSI-Cert software package has its own archived DOI:
 
 ```text
-https://doi.org/10.5281/zenodo.24526577
+https://doi.org/10.5281/zenodo.24535053
 ```
 
 Raw ABC, Fusion 360 Gallery, and MFCAD++ STEP files are not redistributed because of
@@ -144,3 +144,4 @@ MIT. See `LICENSE`. Third-party dataset terms are summarized in `LICENSE_NOTES.m
 
 If you use this software, cite the accompanying manuscript and the archived artifact.
 See `CITATION.cff`.
+

@@ -42,9 +42,10 @@ python -m ssi_cert verify examples/certs/cert_demo.json
 
 ```bash
 sudo apt install libgmp-dev
-g++ -std=c++17 -O2 cpp/cert_verify.cpp -lgmp -o cert_verify
+g++ -std=c++17 -O3 -march=native cpp/cert_verify.cpp -lgmpxx -lgmp -o cert_verify
 ./cert_verify examples/certs/cert_demo.json
 ```
 
 The Python verifier is the reference implementation. The C++ verifier is provided for
 cross-checking and batch use; it is not required by the Python package.
+
