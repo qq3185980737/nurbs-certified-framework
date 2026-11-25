@@ -126,6 +126,12 @@ The full certificate corpus and benchmark artifact are archived on Zenodo:
 https://doi.org/10.5281/zenodo.24126465
 ```
 
+The SSI-Cert software package has its own archived DOI:
+
+```text
+https://doi.org/10.5281/zenodo.24526577
+```
+
 Raw ABC, Fusion 360 Gallery, and MFCAD++ STEP files are not redistributed because of
 their licences. The artifact contains model IDs, conversion scripts, checksums, and the
 derived certificate data.
