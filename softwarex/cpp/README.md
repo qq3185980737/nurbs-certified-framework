@@ -8,7 +8,7 @@ implementation and the one exercised by `pytest`.
 
 ```bash
 sudo apt install libgmp-dev
-g++ -std=c++17 -O2 cert_verify.cpp -lgmpxx -lgmp -o cert_verify
+g++ -std=c++17 -O3 -march=native cert_verify.cpp -lgmpxx -lgmp -o cert_verify
 ```
 
 ## Run
@@ -27,3 +27,4 @@ FINAL: ACCEPT
 
 The C++ verifier uses the same certificate contract as the Python verifier. See
 `../docs/certificate-schema.md`.
+

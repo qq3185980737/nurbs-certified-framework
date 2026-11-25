@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 ssi_verifier.py — 路线 C 原型 v2：独立精确有理数验证器（支持有理权重 w≠1）
@@ -24,7 +24,9 @@ def parse_rat(s):
     """证书中的有理数：\"n/d\" 或 hex float 字符串"""
     if "/" in s:
         return F(s)
-    return F.from_float(float.fromhex(s))
+    if s.lstrip("+-")[:2].lower() == "0x":
+        return F.from_float(float.fromhex(s))
+    raise ValueError("numeric string must be n/d or hex float")
 
 
 def parse_hex(s):
