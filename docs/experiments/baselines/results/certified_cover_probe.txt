@@ -1,0 +1,8 @@
+# certified interval cover for the shared SSI fixtures, parameter tol=1e-03
+# method: cpp/tests/bench_ssi.cpp (interval exclusion + subdivision)
+fixture,excluded_boxes,cover_boxes,subdivisions,time_ms,truth
+A,4052,3070,7121,5.94,"1 curve: diagonal s=t"
+B,1,0,0,0.00,"0 intersections"
+C,20,1,20,0.01,"1 point: corner (0,0) tangency"
+D,40188,85344,125531,145.11,"1 tangential curve s=t"
+E,1417,951,2367,2.77,"1 interior curve: u^3+v^3 = 0.1"

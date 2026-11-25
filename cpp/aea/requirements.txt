@@ -1,0 +1,4 @@
+cadquery-ocp==8.0.1.1.0
+remotezip>=0.12
+requests>=2.31
+numpy>=1.25

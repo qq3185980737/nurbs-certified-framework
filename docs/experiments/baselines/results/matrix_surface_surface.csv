@@ -1,0 +1,6 @@
+fixture,n_t_samples,real_roots_total,curve_points,complex_pts,max_residual,time_ms,roots_per_t_min,roots_per_t_max
+A,201,202,202,0,0.000e+00,18.291,1,2
+B,201,0,0,0,0.000e+00,0.674,0,0
+C,201,1,1,0,0.000e+00,5.080,0,1
+D,201,402,402,0,1.110e-16,25.591,2,2
+E,201,93,93,402,2.776e-17,15.509,0,1

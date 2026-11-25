@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use SSI-Cert, please cite the accompanying manuscript and this software."
+title: "SSI-Cert: Independent exact-rational verification of surface-surface intersection certificates"
+authors:
+  - family-names: "Liu"
+    given-names: "Yang"
+  - family-names: "Wang"
+    given-names: "Xun"
+version: "0.1.0"
+date-released: "2026-11-25"
+license: MIT
+repository-code: "https://github.com/qq3185980737/nurbs-certified-framework"
+url: "https://github.com/qq3185980737/nurbs-certified-framework/tree/main/softwarex"

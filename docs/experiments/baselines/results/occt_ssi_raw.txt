@@ -1,0 +1,14 @@
+OCCT_VERSION_INFO: 8.0.1.2
+fixture,method,tol,is_done,nb_curves,nb_points,samples,max_residual,time_ms,truth
+A,GeomAPI_IntSS,1e-06,1,1,0,41,5.364e-15,2.873,"1 curve: diagonal s=t"
+A,GeomAPI_IntSS,1e-04,1,1,0,41,5.364e-15,1.441,"1 curve: diagonal s=t"
+B,GeomAPI_IntSS,1e-06,1,0,0,0,0.000e+00,0.550,"0 intersections"
+B,GeomAPI_IntSS,1e-04,1,0,0,0,0.000e+00,0.400,"0 intersections"
+C,GeomAPI_IntSS,1e-06,1,0,0,0,0.000e+00,0.303,"1 point: corner (0,0) tangency"
+C,GeomAPI_IntSS,1e-04,1,0,0,0,0.000e+00,0.213,"1 point: corner (0,0) tangency"
+D,GeomAPI_IntSS,1e-06,1,0,0,0,0.000e+00,0.533,"1 tangential/degenerate curve s=t"
+D,GeomAPI_IntSS,1e-04,1,0,0,0,0.000e+00,0.409,"1 tangential/degenerate curve s=t"
+E,GeomAPI_IntSS,1e-06,1,1,0,41,2.714e-08,7.212,"1 interior curve: u^3+v^3 = 0.1"
+E,GeomAPI_IntSS,1e-04,1,1,0,41,2.714e-08,10.822,"1 interior curve: u^3+v^3 = 0.1"
+F,GeomAPI_IntCS,1e-06,1,0,1,1,1.570e-16,4.587,"1 point: (0.866025,0.5,0.5)"
+F,GeomAPI_IntCS,1e-04,1,0,1,1,1.570e-16,0.153,"1 point: (0.866025,0.5,0.5)"

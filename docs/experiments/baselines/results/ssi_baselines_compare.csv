@@ -1,0 +1,7 @@
+fixture,truth,SISL_epsge,SISL_points,SISL_curves,SISL_trace_errors,SISL_residual,SISL_time_ms,OCCT_tol,OCCT_curves,OCCT_points,OCCT_residual,OCCT_time_ms,certified_param_tol,certified_cover_boxes,certified_excluded_boxes,certified_time_ms,note
+A,1 curve: diagonal s=t,1e-6,0,1,0,1.119e-16,0.765,1e-6,1,0,5.364e-15,2.873,1e-3,3070,4052,5.94,transverse curve; all three methods agree
+B,0 intersections,1e-6,0,0,0,0.000e+00,0.002,1e-6,0,0,0.000e+00,0.550,1e-3,0,1,0.00,no intersection; all agree
+C,"1 point: (0,0) corner tangency",1e-6,1,0,0,0.000e+00,0.162,1e-6,0,0,0.000e+00,0.303,1e-3,1,20,0.01,"corner tangency (isolated point); OCCT reports nothing (its GeomAPI_IntSS public result has curves only), SISL reports 1 point"
+D,1 tangential curve: diagonal s=t,1e-6,346,1628,1536,9.537e-07,2923.564,1e-6,0,0,0.000e+00,0.533,1e-3,85344,40188,145.11,"degenerate tangential curve; OCCT reports 0 curves (misses the whole curve), SISL fragments it into many micro-curves + points with s1310 errors, certified cover covers the diagonal"
+E,1 interior curve: u^3+v^3=0.1,1e-6,0,1,0,4.130e-07,0.761,1e-6,1,0,2.714e-08,7.212,1e-3,951,1417,2.77,bicubic x bicubic interior curve; SISL and OCCT agree
+F,"1 point: (0.866025,0.5,0.5)",1e-6,1,0,0,1.110e-16,0.061,1e-6,0,1,1.570e-16,4.587,n/a,n/a,n/a,n/a,rational cylinder x line; surface/curve (GeomAPI_IntCS)

@@ -1,0 +1,7 @@
+part,pairs_checked,points,points_inside_both,pairs_all_inside,pairs_with_miss,point_cover_rate
+107,20,880,880,20,0,1.0
+10,7,320,320,7,0,1.0
+228,19,800,800,19,0,1.0
+387,15,760,760,15,0,1.0
+38,4,160,160,4,0,1.0
+411,22,920,920,22,0,1.0

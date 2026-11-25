@@ -162,3 +162,13 @@ token.txt
 
 # �½����Ż�����Ŀ¼
 build_opt/
+
+# --- 真实零件基准（大文件不入库，仅保留脚本/摘要/CSV）---
+docs/experiments/real_parts/stp/
+docs/experiments/real_parts/data/
+docs/experiments/real_parts/*.zip
+docs/experiments/real_parts/build/
+docs/experiments/baselines/sisl_src/
+docs/experiments/baselines/sisl_build/
+docs/experiments/baselines/*.zip
+docs/experiments/baselines/src/*.o

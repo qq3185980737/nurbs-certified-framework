@@ -1,0 +1,11 @@
+data/raw/
+data/case/
+certificates/
+build/
+*.aux
+*.log
+*.out
+*.toc
+.DS_Store
+__pycache__/
+.venv/
