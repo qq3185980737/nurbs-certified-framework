@@ -4,6 +4,21 @@ A unified **certified** numerical framework for NURBS / Bézier geometric interr
 
 Every reported root is certified — the framework emits **zero false positives and zero false certificates** on its full regression suite.
 
+## SSI-Cert (SoftwareX package)
+
+The `softwarex/` directory contains **SSI-Cert**, a standalone exact-rational verifier for
+surface–surface intersection output certificates:
+
+```bash
+cd softwarex
+python -m pip install -e .
+ssi-cert verify examples/certs/cert_demo.json
+```
+
+It is the software-paper package for the SSI-output certificate work; the C++ certificate
+sources remain under `cpp/`. See `softwarex/README.md` for the certificate contract,
+scope, and limitations.
+
 ## Highlights
 
 - **One residual system, two outcomes.** Curve intersection and shortest distance collapse into a single square residual system whose solutions are certified by the interval Krawczyk test. A global enumeration with adaptive multi-start provably captures all intersections; a 14-DOP bounding-volume hierarchy accelerates pre-filtering.

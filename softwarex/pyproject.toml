@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ssi-cert"
+version = "0.1.0"
+description = "Independent exact-rational verifier for surface-surface intersection certificates"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "Yang Liu" },
+  { name = "Xun Wang" },
+]
+keywords = ["CAD", "surface-surface intersection", "certificate", "verification", "interval arithmetic"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering",
+]
+dependencies = []
+
+[project.scripts]
+ssi-cert = "ssi_cert.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
